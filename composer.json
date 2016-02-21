@@ -1,0 +1,23 @@
+{
+    "name": "joshdifabio/object-stream",
+    "license": "proprietary",
+    "authors": [
+        {
+            "name": "Josh Di Fabio",
+            "email": "joshdifabio@gmail.com"
+        }
+    ],
+    "require": {
+        "php": ">=7.0",
+        "evenement/evenement": "~2.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "ObjectStream\\": "src"
+        },
+        "files": [ "src/functions.php" ]
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^5.1"
+    }
+}
