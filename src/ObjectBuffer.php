@@ -14,7 +14,7 @@ class ObjectBuffer implements DuplexObjectStream
 
     public function __construct(int $highWaterMark)
     {
-        $this->highWaterMark = $highWaterMark;
+        $this->pendingItemLimit = $highWaterMark;
         $this->writeBuffer = new \SplQueue();
         $this->readBuffer = new \SplQueue();
         $this->initWritable();
@@ -93,12 +93,14 @@ class ObjectBuffer implements DuplexObjectStream
         return $objects;
     }
 
-    public function resume()
+    public function resume() : ReadableObjectStream
     {
         if ($this->paused) {
             $this->paused = false;
             $this->flow();
         }
+
+        return $this;
     }
 
     /** @internal */

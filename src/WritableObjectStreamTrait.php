@@ -10,14 +10,9 @@ trait WritableObjectStreamTrait
     private $finished = false;
     private $notifyDrain = false;
     private $pendingItemCount = 0;
-    private $highWaterMark = 0;
+    private $pendingItemLimit = 1;
     private $flushFn;
     private $drainEventStream;
-
-    public function __construct()
-    {
-        $this->initWritable();
-    }
 
     abstract protected function _write($object, callable $onFlush);
 
@@ -68,18 +63,16 @@ trait WritableObjectStreamTrait
         $this->pendingItemCount++;
 
         if (null !== $onFlush) {
-            $onFlush = function () use ($object, $onFlush) {
+            $onFlush = function ($error = null) use ($object, $onFlush) {
+                call_user_func($onFlush, $error);
                 call_user_func($this->flushFn);
-                if (null !== $onFlush) {
-                    call_user_func($onFlush, $object);
-                }
             };
             $this->_write($object, $onFlush);
         } else {
             $this->_write($object, $this->flushFn);
         }
 
-        if ($this->pendingItemCount > 0 && $this->pendingItemCount >= $this->highWaterMark) {
+        if ($this->pendingItemCount >= $this->pendingItemLimit) {
             $this->notifyDrain = true;
             return false;
         }
@@ -102,7 +95,7 @@ trait WritableObjectStreamTrait
                 if ($this->ended) {
                     $this->ensureFinished();
                 }
-            } elseif ($this->pendingItemCount < $this->highWaterMark) {
+            } elseif ($this->pendingItemCount < $this->pendingItemLimit) {
                 $this->writable();
             }
         };

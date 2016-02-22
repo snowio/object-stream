@@ -7,26 +7,15 @@ trait ReadableObjectStreamTrait
     private $paused = false;
     private $pushFn;
 
-    public function __construct()
-    {
-        $this->initReadable();
-    }
-
     public function isPaused() : bool
     {
         return $this->paused;
     }
 
-    public function passTo(callable $destination) : self
-    {
-        call_user_func($destination, $this);
-
-        return $this;
-    }
-
-    public function pause()
+    public function pause() : ReadableObjectStream
     {
         $this->paused = true;
+        return $this;
     }
 
     public function pipe(WritableObjectStream $destination, array $options = [])
@@ -90,9 +79,10 @@ trait ReadableObjectStreamTrait
         return [];
     }
 
-    public function resume()
+    public function resume() : ReadableObjectStream
     {
         $this->paused = false;
+        return $this;
     }
 
     public function unpipe(WritableObjectStream $destination = null)

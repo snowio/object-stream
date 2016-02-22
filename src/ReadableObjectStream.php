@@ -13,9 +13,7 @@ interface ReadableObjectStream extends EventEmitterInterface
 {
     public function isPaused() : bool;
 
-    public function passTo(callable $destination) : self;
-
-    public function pause();
+    public function pause() : self;
 
     /**
      * @return WritableObjectStream|DuplexObjectStream The $destination stream
@@ -24,7 +22,7 @@ interface ReadableObjectStream extends EventEmitterInterface
 
     public function read(int $size = null, bool $allowFewer = true) : array;
 
-    public function resume();
+    public function resume() : self;
 
     public function unpipe(WritableObjectStream $destination = null);
 }

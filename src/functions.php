@@ -39,7 +39,7 @@ function readable(\Iterator $source) : ReadableObjectStream
     return $stream;
 }
 
-function writable(callable $writeFn) : WritableObjectStream
+function writable(callable $writeFn, int $concurrency = 1) : WritableObjectStream
 {
     return new class ($writeFn) implements WritableObjectStream {
         use EventEmitterTrait;
@@ -81,7 +81,12 @@ function composite(WritableObjectStream $writable, ReadableObjectStream $readabl
         use EventEmitterTrait;
         use WritableObjectStreamDecorator;
         use ReadableObjectStreamDecorator;
-        use ReadableObjectStreamTrait;
+        use ReadableObjectStreamTrait {
+            ReadableObjectStreamDecorator::isPaused insteadof ReadableObjectStreamTrait;
+            ReadableObjectStreamDecorator::pause insteadof ReadableObjectStreamTrait;
+            ReadableObjectStreamDecorator::read insteadof ReadableObjectStreamTrait;
+            ReadableObjectStreamDecorator::resume insteadof ReadableObjectStreamTrait;
+        }
 
         public function __construct(WritableObjectStream $writable, ReadableObjectStream $readable)
         {
@@ -91,7 +96,7 @@ function composite(WritableObjectStream $writable, ReadableObjectStream $readabl
     };
 }
 
-function map(callable $mapFn, int $concurrency = 0) : DuplexObjectStream
+function map(callable $mapFn, int $concurrency = 1) : DuplexObjectStream
 {
     $transformFn = function ($object, callable $pushFn, callable $doneFn) use ($mapFn) {
         $mapFn($object, function ($error = null, $result = null) use ($pushFn, $doneFn) {
@@ -118,7 +123,7 @@ function mapSync(callable $mapFn) : DuplexObjectStream
     });
 }
 
-function filter(callable $filterFn, int $concurrency = 0) : DuplexObjectStream
+function filter(callable $filterFn, int $concurrency = 1) : DuplexObjectStream
 {
     $transformFn = function ($object, callable $pushFn, callable $doneFn) use ($filterFn) {
         $filterFn($object, function ($error = null, $keep = null) use ($object, $pushFn, $doneFn) {
@@ -182,7 +187,7 @@ function flatten() : DuplexObjectStream
     return transform($transformFn);
 }
 
-function transform(callable $transformFn, int $concurrency = 0) : DuplexObjectStream
+function transform(callable $transformFn, int $concurrency = 1) : DuplexObjectStream
 {
     return new class ($transformFn, $concurrency) implements DuplexObjectStream {
         use EventEmitterTrait;
@@ -191,10 +196,10 @@ function transform(callable $transformFn, int $concurrency = 0) : DuplexObjectSt
 
         private $transformFn;
 
-        public function __construct(callable $transformFn, int $highWaterMark)
+        public function __construct(callable $transformFn, int $concurrency)
         {
             $this->transformFn = $transformFn;
-            $this->highWaterMark = $highWaterMark;
+            $this->pendingItemLimit = $concurrency;
             $this->initWritable();
             $this->initReadable();
         }

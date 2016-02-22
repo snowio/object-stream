@@ -1,128 +1,67 @@
 <?php
-namespace ObjectStream;
+namespace ObjectStream\Test;
+
+use ObjectStream\DuplexObjectStream;
+use function ObjectStream\pipeline;
+use function ObjectStream\buffer;
+use function ObjectStream\mapSync;
 
 class FunctionsTest extends \PHPUnit_Framework_TestCase
 {
-    public function testConcatenate()
+    public function _testBuffer()
     {
-        $oddNumberGenerator = function () {
-            for ($i = 0; $i < 10; $i++) {
-                yield 2 * $i + 1;
-            }
-        };
-
-        $evenNumberGenerator = function () {
-            for ($i = 1; $i <= 10; $i++) {
-                yield 2 * $i;
-            }
-        };
-
-        $multiplesOfThreeGenerator = function () {
-            for ($i = 1; $i <= 10; $i++) {
-                yield 3 * $i;
-            }
-        };
-
-        $concatenated = concatenate(
-            iteratorToStream($oddNumberGenerator()),
-            iteratorToStream($evenNumberGenerator()),
-            iteratorToStream($multiplesOfThreeGenerator())
+        $this->_testBufferedDuplex(
+            buffer($highWaterMark = 20),
+            $highWaterMark,
+            $input = range(1, 100),
+            $expectedOutput = $input
         );
-
-        $data = [];
-        $concatenated->on('data', function ($_data) use (&$data) {
-            $data[] = $_data;
-        });
-
-        $ended = false;
-        $concatenated->on('end', function ($endSubject) use ($concatenated, &$ended) {
-            $this->assertSame($concatenated, $endSubject);
-            $ended = true;
-        });
-
-        $this->assertEmpty($data);
-        $this->assertFalse($ended);
-        $concatenated->resume();
-        $this->assertTrue($ended);
-
-        $expectedData = array_merge(
-            iterator_to_array($oddNumberGenerator()),
-            iterator_to_array($evenNumberGenerator()),
-            iterator_to_array($multiplesOfThreeGenerator())
-        );
-        $this->assertSame($expectedData, $data);
     }
 
-    public function testIteratorToStream()
+    public function testMapSync()
     {
-        $oddNumberGenerator = function () {
-            for ($i = 0; $i < 10; $i++) {
-                yield 2 * $i + 1;
-            }
-        };
-
-        $oddNumberStream = iteratorToStream($oddNumberGenerator());
-
-        $data = [];
-        $oddNumberStream->on('data', function ($_data) use (&$data) {
-            $data[] = $_data;
-        });
-
-        $ended = false;
-        $oddNumberStream->on('end', function ($endSubject) use ($oddNumberStream, &$ended) {
-            $this->assertSame($oddNumberStream, $endSubject);
-            $ended = true;
-        });
-
-        $this->assertEmpty($data);
-        $this->assertFalse($ended);
-
-        $oddNumberStream->resume();
-        $expectedData = iterator_to_array($oddNumberGenerator());
-        $this->assertSame($expectedData, $data);
-        $this->assertTrue($ended);
+        $this->_testBufferedDuplex(
+            pipeline(
+                mapSync(function (int $input) { return 2 * $input; }),
+                buffer($highWaterMark = 20)
+            ),
+            $highWaterMark,
+            $input = range(1, 100),
+            $expectedOutput = range(2, 200, 2)
+        );
     }
 
-    public function testTransformerBasic()
+    protected function _testBufferedDuplex(DuplexObjectStream $stream, int $highWaterMark, array $input, array $expectedOutput)
     {
-        $oddNumberGenerator = function () {
-            for ($i = 0; $i < 10; $i++) {
-                yield 2 * $i + 1;
-            }
-        };
+        $stream->pause();
 
-        $evenNumberGenerator = function () {
-            for ($i = 1; $i <= 10; $i++) {
-                yield 2 * $i;
-            }
-        };
+        $flushResults = [];
+        $collectedData = [];
 
-        $oddNumberStream = iteratorToStream($oddNumberGenerator());
+        foreach ($input as $i => $item) {
+            $feedMore = $stream->write($item, Promise::resolver(function ($error = null, $result = null) use (&$flushResults) {
+                $flushResults[] = [$error, $result];
+            }));
+//            $this->assertSame($i < $highWaterMark - 1, $feedMore);
+        }
 
-        $evenNumberStream = transformer(function (int $oddNumber) {
-            return $oddNumber + 1;
+        $stream->on('data', function ($data) use (&$collectedData) {
+            $collectedData[] = $data;
         });
 
-        $oddNumberStream->pipe($evenNumberStream);
+//        $this->assertEmpty($flushResults);
+        $this->assertEmpty($collectedData);
 
-        $data = [];
-        $evenNumberStream->on('data', function ($_data) use (&$data) {
-            $data[] = $_data;
-        });
+        $stream->resume();
 
-        $ended = false;
-        $evenNumberStream->on('end', function ($endSubject) use ($evenNumberStream, &$ended) {
-            $this->assertSame($evenNumberStream, $endSubject);
-            $ended = true;
-        });
+        $this->assertSame($expectedOutput, $collectedData);
+        $this->assertCount(count($input), $flushResults);
 
-        $this->assertEmpty($data);
-        $this->assertFalse($ended);
-
-        $oddNumberStream->resume();
-
-        $expectedData = iterator_to_array($evenNumberGenerator());
-        $this->assertSame($expectedData, $data);
-        $this->assertTrue($ended);
+        foreach ($input as $item) {
+            $feedMore = $stream->write($item, Promise::resolver(function ($error = null, $result = null) use (&$flushResults) {
+                $flushResults[] = [$error, $result];
+            }));
+            $this->assertTrue($feedMore);
+        }
     }
 }

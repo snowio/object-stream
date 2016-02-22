@@ -26,9 +26,10 @@ trait ReadableObjectStreamDecorator
         return $this->readable->isPaused();
     }
 
-    public function pause()
+    public function pause() : ReadableObjectStream
     {
         $this->readable->pause();
+        return $this;
     }
 
     public function read(int $size = null, bool $allowFewer = true) : array
@@ -36,8 +37,9 @@ trait ReadableObjectStreamDecorator
         return $this->readable->read($size, $allowFewer);
     }
 
-    public function resume()
+    public function resume() : ReadableObjectStream
     {
         $this->readable->resume();
+        return $this;
     }
 }
