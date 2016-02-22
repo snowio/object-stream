@@ -66,13 +66,20 @@ function pipeline(DuplexObjectStream ...$streams) : DuplexObjectStream
         return through();
     }
 
+    $pipeline = null;
+
+    $forwardError = function ($error) use (&$pipeline) {
+        $pipeline->emit('error', [$error]);
+    };
     $first = $last = $previous = array_shift($streams);
+    $first->on('error', $forwardError);
 
     foreach ($streams as $stream) {
         $last = $previous = $previous->pipe($stream);
+        $last->on('error', $forwardError);
     }
 
-    return composite($first, $last);
+    return $pipeline = composite($first, $last);
 }
 
 function composite(WritableObjectStream $writable, ReadableObjectStream $readable) : DuplexObjectStream

@@ -68,7 +68,7 @@ trait ReadableObjectStreamTrait
                 $this->removeListener('end', $ender);
             };
 
-            $this->on('end', $ender);
+            $this->once('end', $ender);
         }
 
         return $destination;

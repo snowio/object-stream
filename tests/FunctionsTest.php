@@ -5,10 +5,11 @@ use ObjectStream\DuplexObjectStream;
 use function ObjectStream\pipeline;
 use function ObjectStream\buffer;
 use function ObjectStream\mapSync;
+use function ObjectStream\through;
 
 class FunctionsTest extends \PHPUnit_Framework_TestCase
 {
-    public function _testBuffer()
+    public function testBuffer()
     {
         $this->_testBufferedDuplex(
             buffer($highWaterMark = 20),
@@ -28,6 +29,21 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
             $highWaterMark,
             $input = range(1, 100),
             $expectedOutput = range(2, 200, 2)
+        );
+    }
+
+    public function testThroughStream()
+    {
+        $this->_testBufferedDuplex(
+            pipeline(
+                through(),
+                buffer($highWaterMark = 10),
+                through(),
+                buffer($highWaterMark = 10)
+            ),
+            $highWaterMark,
+            $input = range(1, 15),
+            $expectedOutput = $input
         );
     }
 

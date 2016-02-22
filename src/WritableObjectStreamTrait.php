@@ -111,6 +111,7 @@ trait WritableObjectStreamTrait
 
         $this->finished = true;
         $this->emit('finish', [$this]);
+        $this->emit('end', [$this]);
     }
 
     private function writable()
