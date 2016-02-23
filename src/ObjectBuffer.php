@@ -117,7 +117,7 @@ class ObjectBuffer implements DuplexObjectStream
         $this->emit('data', [$object, $this]);
 
         if (null !== $onFlush) {
-            call_user_func($onFlush, $object);
+            call_user_func($onFlush);
         }
     }
 
