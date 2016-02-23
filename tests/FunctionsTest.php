@@ -13,8 +13,8 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
     public function testBuffer()
     {
         $this->_testBufferedDuplex(
-            buffer($highWaterMark = 20),
-            $highWaterMark,
+            buffer(['highWaterMark' => 20]),
+            $highWaterMark = 20,
             $input = range(1, 100),
             $expectedOutput = $input
         );
@@ -25,9 +25,9 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
         $this->_testBufferedDuplex(
             pipeline(
                 mapSync(function (int $input) { return 2 * $input; }),
-                buffer($highWaterMark = 20)
+                buffer(['highWaterMark' => 20])
             ),
-            $highWaterMark,
+            $highWaterMark = 20,
             $input = range(1, 100),
             $expectedOutput = range(2, 200, 2)
         );
@@ -38,11 +38,11 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
         $this->_testBufferedDuplex(
             pipeline(
                 through(),
-                buffer($highWaterMark = 10),
+                buffer(['highWaterMark' => 10]),
                 through(),
-                buffer($highWaterMark = 10)
+                buffer(['highWaterMark' => 10])
             ),
-            $highWaterMark,
+            $highWaterMark = 10,
             $input = range(1, 15),
             $expectedOutput = $input
         );
