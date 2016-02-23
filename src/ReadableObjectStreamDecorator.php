@@ -11,8 +11,8 @@ trait ReadableObjectStreamDecorator
         $this->readable = $readable;
 
         foreach (['data', 'end', 'error', 'readable'] as $eventName) {
-            $readable->on($eventName, function () use ($eventName) {
-                $this->emit($eventName, func_get_args());
+            $readable->on($eventName, function (...$args) use ($eventName) {
+                $this->emit($eventName, $args);
             });
         }
     }

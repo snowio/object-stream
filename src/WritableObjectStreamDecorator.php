@@ -13,8 +13,8 @@ trait WritableObjectStreamDecorator
         $this->writable = $writable;
 
         foreach (['drain', 'error', 'finish', 'pipe', 'unpipe'] as $eventName) {
-            $writable->on($eventName, function () use ($eventName) {
-                $this->emit($eventName, func_get_args());
+            $writable->on($eventName, function (...$args) use ($eventName) {
+                $this->emit($eventName, $args);
             });
         }
     }
