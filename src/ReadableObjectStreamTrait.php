@@ -104,7 +104,7 @@ trait ReadableObjectStreamTrait
     private function initReadable()
     {
         $this->pushFn = function ($object) : bool {
-            $this->emit('data', [$object, $this]);
+            $this->emit('data', [$object]);
             return !$this->paused;
         };
     }

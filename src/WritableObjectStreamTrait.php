@@ -30,7 +30,7 @@ trait WritableObjectStreamTrait
         if ($this->ended) {
             if (null !== $onFinish) {
                 if ($this->finished) {
-                    call_user_func($onFinish, [$this]);
+                    call_user_func($onFinish);
                 } else {
                     $this->on('finish', $onFinish);
                 }
@@ -86,7 +86,7 @@ trait WritableObjectStreamTrait
             $this->pendingItemCount--;
 
             if ($error) {
-                $this->emit('error', [$error, $this]);
+                $this->emit('error', [$error]);
             }
 
             if ($this->pendingItemCount <= 0) {
@@ -110,15 +110,15 @@ trait WritableObjectStreamTrait
         }
 
         $this->finished = true;
-        $this->emit('finish', [$this]);
-        $this->emit('end', [$this]);
+        $this->emit('finish');
+        $this->emit('end');
     }
 
     private function writable()
     {
         if ($this->notifyDrain) {
             $this->notifyDrain = false;
-            $this->emit('drain', [$this]);
+            $this->emit('drain');
         }
     }
 }

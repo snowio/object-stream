@@ -10,15 +10,11 @@ trait ReadableObjectStreamDecorator
     {
         $this->readable = $readable;
 
-        foreach (['end', 'readable'] as $readEvent) {
-            $readable->on($readEvent, function () use ($readEvent) {
-                $this->emit($readEvent, [$this]);
+        foreach (['data', 'end', 'error', 'readable'] as $eventName) {
+            $readable->on($eventName, function () use ($eventName) {
+                $this->emit($eventName, func_get_args());
             });
         }
-
-        $readable->on('data', function ($data) {
-            $this->emit('data', [$data, $this]);
-        });
     }
 
     public function isPaused(): bool

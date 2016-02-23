@@ -38,7 +38,7 @@ class ObjectBuffer implements DuplexObjectStream
         if (!$this->paused) {
             $this->flow();
         } elseif ($readBufferWasEmpty && !$this->readBuffer->isEmpty()) {
-            $this->emit('readable', [$this]);
+            $this->emit('readable');
         }
     }
 
@@ -55,7 +55,7 @@ class ObjectBuffer implements DuplexObjectStream
             $readBufferWasEmpty = $this->readBuffer->isEmpty();
             $this->readBuffer->enqueue([$object, $onFlush]);
             if ($readBufferWasEmpty) {
-                $this->emit('readable', [$this]);
+                $this->emit('readable');
             }
             return;
         }
@@ -114,7 +114,7 @@ class ObjectBuffer implements DuplexObjectStream
 
     private function emitData($object, callable $onFlush = null)
     {
-        $this->emit('data', [$object, $this]);
+        $this->emit('data', [$object]);
 
         if (null !== $onFlush) {
             call_user_func($onFlush);
