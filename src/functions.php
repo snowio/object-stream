@@ -116,7 +116,7 @@ function map(callable $mapFn, array $options = []) : DuplexObjectStream
         });
     };
 
-    return transform($transformFn, $options);
+    return transform($transformFn, null, $options);
 }
 
 function mapSync(callable $mapFn) : DuplexObjectStream
@@ -145,7 +145,7 @@ function filter(callable $filterFn, array $options = []) : DuplexObjectStream
         });
     };
 
-    return transform($transformFn, $options);
+    return transform($transformFn, null, $options);
 }
 
 function filterSync(callable $filterFn) : DuplexObjectStream
@@ -194,7 +194,7 @@ function flatten() : DuplexObjectStream
     return transform($transformFn);
 }
 
-function transform(callable $transformFn, array $options = []) : DuplexObjectStream
+function transform(callable $transformFn, callable $flushFn = null, array $options = []) : DuplexObjectStream
 {
     return new class ($transformFn, $concurrency['concurrency'] ?? 1) implements DuplexObjectStream {
         use EventEmitterTrait;
