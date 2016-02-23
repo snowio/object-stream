@@ -263,7 +263,9 @@ function iterator(ReadableObjectStream $stream, callable $waitFn) : \Iterator
             $stream->once('error', [$promise, 'fail']);
             $waitFn($promise);
         } else {
-            yield $items[0];
+            foreach ($items as $item) {
+                yield $item;
+            }
         }
     }
 }
