@@ -242,3 +242,101 @@ function through() : DuplexObjectStream
         }
     };
 }
+
+function iterator(ReadableObjectStream $stream, callable $waitFn) : \Iterator
+{
+    $stream->pause();
+
+    $ended = false;
+
+    $stream->on('end', function () use (&$ended) {
+        $ended = true;
+    });
+
+    while (!$ended) {
+        $items = $stream->read(1);
+
+        if (empty($items)) {
+            $promise = __promise($graceful = true);
+            $stream->once('readable', [$promise, 'succeed']);
+            $stream->once('end', [$promise, 'succeed']);
+            $stream->once('error', [$promise, 'fail']);
+            $waitFn($promise);
+        } else {
+            yield $items[0];
+        }
+    }
+}
+
+function __promise(bool $graceful)
+{
+    return new class ($graceful) {
+        private $graceful;
+        private $isResolved = false;
+        private $error;
+        private $result;
+        private $observers = [];
+
+        public function __construct(bool $graceful)
+        {
+            $this->graceful = $graceful;
+        }
+
+        public function isResolved() : bool
+        {
+            return $this->isResolved;
+        }
+
+        public function then(callable $onSuccess = null, callable $onFailure = null)
+        {
+            $this->observers[] = function (\Throwable $error = null, $result = null) use ($onSuccess, $onFailure) {
+                if (null === $error) {
+                    call_user_func($onSuccess, $result);
+                } else {
+                    call_user_func($onFailure, $error);
+                }
+            };
+        }
+
+        public function when(callable $callback, $cbData = null) : self
+        {
+            if ($this->isResolved) {
+                $callback($this->error, $this->result, $cbData);
+            } else {
+                $this->observers[] = [$callback, $cbData];
+            }
+
+            return $this;
+        }
+
+        public function succeed($result = null) : self
+        {
+            return $this->resolve(null, $result);
+        }
+
+        public function fail(\Throwable $error) : self
+        {
+            return $this->resolve($error);
+        }
+
+        public function resolve(\Throwable $error = null, $result = null) : self
+        {
+            if ($this->isResolved) {
+                if ($this->graceful) {
+                    return $this;
+                }
+                throw new \LogicException('Promise already resolved');
+            }
+
+            $this->isResolved = true;
+            $this->error = $error;
+            $this->result = $result;
+
+            while (null !== $observer = array_shift($this->observers)) {
+                $this->when($observer[0], $observer[1]);
+            }
+
+            return $this;
+        }
+    };
+}

@@ -6,6 +6,7 @@ use function ObjectStream\pipeline;
 use function ObjectStream\buffer;
 use function ObjectStream\mapSync;
 use function ObjectStream\through;
+use function ObjectStream\iterator;
 
 class FunctionsTest extends \PHPUnit_Framework_TestCase
 {
@@ -45,6 +46,42 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
             $input = range(1, 15),
             $expectedOutput = $input
         );
+    }
+
+    public function testStreamToIterator()
+    {
+        $i = 0;
+        $stream = buffer();
+
+        $waitFn = function () use ($stream, &$i) {
+            if ($i < 10) {
+                $stream->write($i++);
+            } else {
+                $stream->end();
+            }
+        };
+
+        $this->assertSame(range(0, 9), iterator_to_array(iterator($stream, $waitFn)));
+    }
+
+    public function testStreamToIteratorError()
+    {
+        $stream = buffer();
+        $error = new \DomainException;
+
+        $waitFn = function ($promise) use ($stream, $error) {
+            $stream->emit('error', [$error]);
+            $promise->when(function ($error) {
+                throw $error;
+            });
+        };
+
+        try {
+            iterator($stream, $waitFn)->next();
+            $this->fail();
+        } catch (\DomainException $e) {
+            $this->assertSame($error, $e);
+        }
     }
 
     protected function _testBufferedDuplex(DuplexObjectStream $stream, int $highWaterMark, array $input, array $expectedOutput)
