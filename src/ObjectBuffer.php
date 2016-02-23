@@ -112,13 +112,10 @@ class ObjectBuffer implements DuplexObjectStream
         } while ([] !== $objects && !$this->paused);
     }
 
-    private function emitData($object, callable $onFlush = null)
+    private function emitData($object, callable $onFlush)
     {
         $this->emit('data', [$object]);
-
-        if (null !== $onFlush) {
-            call_user_func($onFlush);
-        }
+        call_user_func($onFlush);
     }
 
     private function dequeueFromReadBuffer(int $size = null) : array
