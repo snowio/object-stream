@@ -13,7 +13,7 @@ function readable(\Iterator $source) : ReadableObjectStream
     $stream = buffer();
     $stream->pause();
 
-    $stream->on('drain', function (DuplexObjectStream $stream) use ($source) {
+    $stream->on('drain', function () use ($source, $stream) {
         do {
             $source->next();
             if (!$source->valid()) {

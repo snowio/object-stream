@@ -7,6 +7,7 @@ use function ObjectStream\buffer;
 use function ObjectStream\mapSync;
 use function ObjectStream\through;
 use function ObjectStream\iterator;
+use function ObjectStream\readable;
 
 class FunctionsTest extends \PHPUnit_Framework_TestCase
 {
@@ -46,6 +47,27 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
             $input = range(1, 15),
             $expectedOutput = $input
         );
+    }
+
+    public function testIteratorToStream()
+    {
+        $iterator = new \ArrayIterator(range(0, 9));
+        $stream = readable($iterator);
+
+        $items = [];
+        $ended = false;
+
+        $stream->on('data', function ($item) use (&$items) {
+            $items[] = $item;
+        });
+        $stream->on('end', function () use (&$ended) {
+            $ended = true;
+        });
+
+        $stream->resume();
+
+        $this->assertSame(range(0, 9), $items);
+        $this->assertTrue($ended);
     }
 
     public function testStreamToIterator()
