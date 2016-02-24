@@ -11,6 +11,32 @@ use function ObjectStream\readable;
 
 class FunctionsTest extends \PHPUnit_Framework_TestCase
 {
+    public function testBufferPipeline()
+    {
+        $pipeline = pipeline(
+            buffer(['highWaterMark' => 1]),
+            buffer(['highWaterMark' => 1]),
+            buffer(['highWaterMark' => 1])->pause()
+        );
+
+        $items = [];
+        $pipeline->on('data', $onData = function ($item) use (&$items) {
+            $items[] = $item;
+        });
+        $pipeline->on('end', function () use ($pipeline, $onData) {
+            $pipeline->removeListener('data', $onData);
+        });
+
+        for ($i = 0; $i < 100; $i++) {
+            $pipeline->write($i);
+        }
+
+        $pipeline->end();
+        $pipeline->resume();
+
+        $this->assertSame(range(0, $i - 1), $items);
+    }
+
     public function testBuffer()
     {
         $this->_testBufferedDuplex(

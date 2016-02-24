@@ -91,10 +91,10 @@ trait WritableObjectStreamTrait
 
             if ($this->pendingItemCount <= 0) {
                 $this->writable();
+            }
 
-                if ($this->ended) {
-                    $this->ensureFinished();
-                }
+            if ($this->pendingItemCount <= 0 && $this->ended) {
+                $this->ensureFinished();
             } elseif ($this->pendingItemCount < $this->pendingItemLimit) {
                 $this->writable();
             }
