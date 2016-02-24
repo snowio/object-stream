@@ -94,6 +94,7 @@ trait WritableObjectStreamTrait
             }
 
             if ($this->pendingItemCount <= 0 && $this->ended) {
+                // invoking writable() can cause $this->pendingItemCount to change!!
                 $this->ensureFinished();
             } elseif ($this->pendingItemCount < $this->pendingItemLimit) {
                 $this->writable();
