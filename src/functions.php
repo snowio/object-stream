@@ -39,16 +39,17 @@ function readable(\Iterator $source) : ReadableObjectStream
     return $stream;
 }
 
-function writable(callable $writeFn) : WritableObjectStream
+function writable(callable $writeFn, array $options = []) : WritableObjectStream
 {
-    return new class ($writeFn) implements WritableObjectStream {
+    return new class ($writeFn, $options['concurrency'] ?? 1) implements WritableObjectStream {
         use EventEmitterTrait;
         use WritableObjectStreamTrait;
 
         private $writeFn;
 
-        public function __construct(callable $writeFn)
+        public function __construct(callable $writeFn, int $concurrency)
         {
+            $this->pendingItemLimit = $concurrency;
             $this->writeFn = $writeFn;
             $this->initWritable();
         }
