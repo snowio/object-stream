@@ -292,19 +292,23 @@ function __promise(bool $graceful)
 
         public function then(callable $onSuccess = null, callable $onFailure = null)
         {
-            $this->observers[] = function (\Throwable $error = null, $result = null) use ($onSuccess, $onFailure) {
+            $this->when(function (\Throwable $error = null, $result = null) use ($onSuccess, $onFailure) {
                 if (null === $error) {
                     call_user_func($onSuccess, $result);
                 } else {
                     call_user_func($onFailure, $error);
                 }
-            };
+            });
         }
 
         public function when(callable $callback, $cbData = null) : self
         {
             if ($this->isResolved) {
-                $callback($this->error, $this->result, $cbData);
+                if ($cbData === null) {
+                    $callback($this->error, $this->result);
+                } else {
+                    $callback($this->error, $this->result, $cbData);
+                }
             } else {
                 $this->observers[] = [$callback, $cbData];
             }
