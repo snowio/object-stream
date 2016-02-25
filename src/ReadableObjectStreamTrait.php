@@ -171,10 +171,7 @@ trait ReadableObjectStreamTrait
                     $this->emit('readable');
                 }
             } else {
-                $this->emit('data', [$object]);
-                if (null !== $onFlush) {
-                    call_user_func($onFlush);
-                }
+                $this->emitData($object, $onFlush);
             }
 
             return $this->readBuffer->count() < $this->pendingItemLimit;

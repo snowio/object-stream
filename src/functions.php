@@ -123,8 +123,7 @@ function map(callable $mapFn, array $options = []) : DuplexObjectStream
             if (null !== $error) {
                 $doneFn($error);
             } else {
-                $pushFn($result);
-                $doneFn();
+                $pushFn($result, $doneFn);
             }
         });
     };
@@ -151,9 +150,10 @@ function filter(callable $filterFn, array $options = []) : DuplexObjectStream
                 $doneFn($error);
             } else {
                 if ($keep) {
-                    $pushFn($object);
+                    $pushFn($object, $doneFn);
+                } else {
+                    $doneFn();
                 }
-                $doneFn();
             }
         });
     };
@@ -211,7 +211,9 @@ function transform(callable $transformFn, callable $flushFn = null, array $optio
 {
     return new class ($transformFn, $concurrency['concurrency'] ?? 1) implements DuplexObjectStream {
         use EventEmitterTrait;
-        use WritableObjectStreamTrait;
+        use WritableObjectStreamTrait {
+            end as _end;
+        }
         use ReadableObjectStreamTrait;
 
         private $transformFn;
@@ -227,6 +229,12 @@ function transform(callable $transformFn, callable $flushFn = null, array $optio
         protected function _write($object, callable $onFlush)
         {
             call_user_func($this->transformFn, $object, $this->pushFn, $onFlush, $this->drainEventStream);
+        }
+
+        public function end($object = null, callable $onFinish = null)
+        {
+            $this->_end($object, $onFinish);
+            $this->endRead();
         }
     };
 }

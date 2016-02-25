@@ -222,6 +222,8 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
             }));
             $this->assertTrue($feedMore);
         }
+
+        $stream->end();
     }
 
     public function waitFn(float $timeout)
