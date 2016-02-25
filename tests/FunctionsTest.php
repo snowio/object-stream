@@ -141,7 +141,7 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
             $ended = true;
         });
 
-        $this->eventLoop->addTimer(0.01, function () use ($buffer) {
+        $this->eventLoop->addTimer(0, function () use ($buffer) {
             $stream = readable(new \ArrayIterator([]));
             $stream->pipe($buffer);
             $stream->resume();
