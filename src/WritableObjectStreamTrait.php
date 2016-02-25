@@ -6,15 +6,17 @@ use ObjectStream\Exception\StreamEndedException;
 trait WritableObjectStreamTrait
 {
     private $corked = false;
-    private $ended = false;
+    private $writeEnded = false;
     private $finished = false;
     private $notifyDrain = false;
     private $pendingItemCount = 0;
     private $pendingItemLimit = 1;
     private $flushFn;
     private $drainEventStream;
+    /** @var \SplQueue */
+    private $writeBuffer;
 
-    abstract protected function _write($object, callable $onFlush);
+    abstract protected function _write($object, callable $flushFn);
 
     public function cork()
     {
@@ -27,7 +29,7 @@ trait WritableObjectStreamTrait
             $this->write($object);
         }
 
-        if ($this->ended) {
+        if ($this->writeEnded) {
             if (null !== $onFinish) {
                 if ($this->finished) {
                     call_user_func($onFinish);
@@ -41,7 +43,7 @@ trait WritableObjectStreamTrait
             }
 
             $this->uncork();
-            $this->ended = true;
+            $this->writeEnded = true;
 
             if (0 >= $this->pendingItemCount) {
                 $this->ensureFinished();
@@ -51,25 +53,27 @@ trait WritableObjectStreamTrait
 
     public function uncork()
     {
-        $this->corked = false;
+        if (!$this->corked) {
+            return;
+        }
+
+        while (!$this->corked && !$this->writeBuffer->isEmpty()) {
+            $this->doWrite(...$this->writeBuffer->dequeue());
+        }
     }
 
     public function write($object, callable $onFlush = null) : bool
     {
-        if ($this->ended) {
+        if ($this->writeEnded) {
             throw new StreamEndedException;
         }
 
         $this->pendingItemCount++;
 
-        if (null !== $onFlush) {
-            $onFlush = function ($error = null) use ($object, $onFlush) {
-                call_user_func($onFlush, $error);
-                call_user_func($this->flushFn);
-            };
-            $this->_write($object, $onFlush);
+        if ($this->corked) {
+            $this->writeBuffer->enqueue([$object, $onFlush]);
         } else {
-            $this->_write($object, $this->flushFn);
+            $this->doWrite($object, $onFlush);
         }
 
         if ($this->pendingItemCount >= $this->pendingItemLimit) {
@@ -80,8 +84,23 @@ trait WritableObjectStreamTrait
         return true;
     }
 
+    private function doWrite($object, callable $onFlush = null)
+    {
+        if (null !== $onFlush) {
+            $onFlush = function ($error = null) use ($object, $onFlush) {
+                call_user_func($onFlush, $error);
+                call_user_func($this->flushFn);
+            };
+            $this->_write($object, $onFlush);
+        } else {
+            $this->_write($object, $this->flushFn);
+        }
+    }
+
     private function initWritable()
     {
+        $this->writeBuffer = new \SplQueue();
+
         $this->flushFn = function ($error = null) {
             $this->pendingItemCount--;
 
@@ -93,7 +112,7 @@ trait WritableObjectStreamTrait
                 $this->writable();
             }
 
-            if ($this->pendingItemCount <= 0 && $this->ended) {
+            if ($this->pendingItemCount <= 0 && $this->writeEnded) {
                 // invoking writable() can cause $this->pendingItemCount to change!!
                 $this->ensureFinished();
             } elseif ($this->pendingItemCount < $this->pendingItemLimit) {
@@ -112,7 +131,6 @@ trait WritableObjectStreamTrait
 
         $this->finished = true;
         $this->emit('finish');
-        $this->emit('end');
     }
 
     private function writable()

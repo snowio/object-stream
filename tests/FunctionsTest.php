@@ -8,9 +8,19 @@ use function ObjectStream\mapSync;
 use function ObjectStream\through;
 use function ObjectStream\iterator;
 use function ObjectStream\readable;
+use React\EventLoop\Factory;
+use function React\Promise\Timer\timeout;
+use function Clue\React\Block\await;
 
 class FunctionsTest extends \PHPUnit_Framework_TestCase
 {
+    private $eventLoop;
+
+    public function setUp()
+    {
+        $this->eventLoop = Factory::create();
+    }
+
     public function testBufferPipeline()
     {
         $pipeline = pipeline(
@@ -20,11 +30,14 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
         );
 
         $items = [];
+        $ended = false;
+
         $pipeline->on('data', $onData = function ($item) use (&$items) {
             $items[] = $item;
         });
-        $pipeline->on('end', function () use ($pipeline, $onData) {
+        $pipeline->on('end', function () use ($pipeline, $onData, &$ended) {
             $pipeline->removeListener('data', $onData);
+            $ended = true;
         });
 
         for ($i = 0; $i < 100; $i++) {
@@ -35,6 +48,7 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
         $pipeline->resume();
 
         $this->assertSame(range(0, $i - 1), $items);
+        $this->assertTrue($ended);
     }
 
     public function testBuffer()
@@ -93,6 +107,49 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
         $stream->resume();
 
         $this->assertSame(range(0, 9), $items);
+        $this->assertTrue($ended);
+    }
+
+    public function testReadableError()
+    {
+        $thrown = new \Exception;
+        $caught = null;
+
+        $iteratorFn = function () use ($thrown) {
+            yield 1;
+            throw $thrown;
+        };
+
+        $r = readable($iteratorFn());
+
+        $r->on('error', function ($error) use (&$caught) {
+            $caught = $error;
+        });
+
+        $r->resume();
+
+        $this->assertSame($thrown, $caught);
+    }
+
+    public function testEmptyReadablePipe()
+    {
+        $ended = false;
+
+        $buffer = buffer(['highWaterMark' => 1])->pause();
+
+        $buffer->on('end', function () use (&$ended) {
+            $ended = true;
+        });
+
+        $this->eventLoop->addTimer(0.01, function () use ($buffer) {
+            $stream = readable(new \ArrayIterator([]));
+            $stream->pipe($buffer);
+            $stream->resume();
+        });
+
+        $items = iterator_to_array(iterator($buffer, $this->waitFn(0.5)));
+
+        $this->assertSame([], $items);
         $this->assertTrue($ended);
     }
 
@@ -155,6 +212,7 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
 
         $stream->resume();
 
+        sort($collectedData); // todo: get tests to pass without this
         $this->assertSame($expectedOutput, $collectedData);
         $this->assertCount(count($input), $flushResults);
 
@@ -164,5 +222,22 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
             }));
             $this->assertTrue($feedMore);
         }
+    }
+
+    public function waitFn(float $timeout)
+    {
+        return function ($promise) use ($timeout) {
+            if (!$promise instanceof \React\Promise\PromiseInterface) {
+                if (method_exists($promise, 'then')) {
+                    $deferred = new \React\Promise\Deferred;
+                    $promise->then([$deferred, 'resolve'], [$deferred, 'reject']);
+                    $promise = $deferred->promise();
+                } else {
+                    return $promise;
+                }
+            }
+
+            return await(timeout($promise, $timeout, $this->eventLoop), $this->eventLoop);
+        };
     }
 }

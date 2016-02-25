@@ -5,7 +5,18 @@ trait ReadableObjectStreamTrait
 {
     private $pipeDestroyers = [];
     private $paused = false;
+    /** @var callable */
     private $pushFn;
+    /** @var \SplQueue */
+    private $readBuffer;
+    private $pendingItemLimit = 1;
+    private $readEnded = false;
+    private $readEndEmitted = false;
+
+    protected function _read(int $size, callable $pushFn)
+    {
+
+    }
 
     public function isPaused() : bool
     {
@@ -76,12 +87,52 @@ trait ReadableObjectStreamTrait
 
     public function read(int $size = null, bool $allowFewer = true) : array
     {
-        return [];
+        if ($size < 0) {
+            throw new \InvalidArgumentException('Size must be null or a non-negative integer.');
+        }
+
+        if (0 === $size) {
+            try {
+                $this->_read(1, $this->pushFn);
+            } catch (\Throwable $e) {
+                $this->emit('error', [$e]);
+            }
+            return [];
+        }
+        if ($this->readBuffer->isEmpty()) {
+            return [];
+        }
+        if ($size > $this->readBuffer->count() && !$allowFewer) {
+            return [];
+        }
+
+        $objects = [];
+
+        foreach ($this->dequeueFromReadBuffer($size) as list($object, $onFlush)) {
+            $this->emitData($object, $onFlush);
+            $objects[] = $object;
+        }
+
+        if ($this->readEnded && $this->readBuffer->isEmpty()) {
+            $this->ensureEndEmitted();
+        }
+
+        return $objects;
     }
 
     public function resume() : ReadableObjectStream
     {
         $this->paused = false;
+
+        while (!$this->paused) {
+            if ([] === $this->read(1)) {
+                $this->read(0);
+                if ([] === $this->read(1)) {
+                    break;
+                }
+            }
+        }
+
         return $this;
     }
 
@@ -101,11 +152,32 @@ trait ReadableObjectStreamTrait
         $this->invokeAll($this->pipeDestroyers[$destinationHash]);
     }
 
+    /** @internal */
+
     private function initReadable()
     {
-        $this->pushFn = function ($object) : bool {
-            $this->emit('data', [$object]);
-            return !$this->paused;
+        $this->readBuffer = new \SplQueue();
+
+        $this->pushFn = function ($object, callable $onFlush = null) : bool {
+            if (null === $object) {
+                $this->endRead();
+                return false;
+            }
+
+            if ($this->paused) {
+                $readBufferWasEmpty = $this->readBuffer->isEmpty();
+                $this->readBuffer->enqueue([$object, $onFlush]);
+                if ($readBufferWasEmpty) {
+                    $this->emit('readable');
+                }
+            } else {
+                $this->emit('data', [$object]);
+                if (null !== $onFlush) {
+                    call_user_func($onFlush);
+                }
+            }
+
+            return $this->readBuffer->count() < $this->pendingItemLimit;
         };
     }
 
@@ -120,6 +192,41 @@ trait ReadableObjectStreamTrait
     {
         foreach ($closures as $closure) {
             $closure();
+        }
+    }
+
+    private function emitData($object, callable $onFlush = null)
+    {
+        $this->emit('data', [$object]);
+        if ($onFlush) {
+            call_user_func($onFlush);
+        }
+    }
+
+    private function ensureEndEmitted()
+    {
+        if (!$this->readEndEmitted) {
+            $this->readEndEmitted = true;
+            $this->emit('end');
+        }
+    }
+
+    private function dequeueFromReadBuffer(int $size = null) : array
+    {
+        $tuples = [];
+
+        for ($i = 1; $i <= $size ?: PHP_INT_MAX, !$this->readBuffer->isEmpty(); $i++) {
+            $tuples[] = $this->readBuffer->dequeue();
+        }
+
+        return $tuples;
+    }
+
+    private function endRead()
+    {
+        $this->readEnded = true;
+        if ($this->readBuffer->isEmpty()) {
+            $this->ensureEndEmitted();
         }
     }
 }

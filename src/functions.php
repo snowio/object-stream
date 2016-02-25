@@ -5,38 +5,50 @@ use Evenement\EventEmitterTrait;
 
 function buffer(array $options = []) : DuplexObjectStream
 {
-    return new ObjectBuffer($options['highWaterMark'] ?? 1);
+    return through($options);
 }
 
-function readable(\Iterator $source) : ReadableObjectStream
+function readable($source) : ReadableObjectStream
 {
-    $stream = buffer();
-    $stream->pause();
+    if (is_array($source)) {
+        $source = new \ArrayIterator($source);
+    }
 
-    $stream->on('drain', function () use ($source, $stream) {
-        do {
-            $source->next();
-            if (!$source->valid()) {
-                $stream->end();
-                return;
-            }
-            $data = $source->current();
-            $feedMore = $stream->write($data);
-        } while ($feedMore);
-    });
+    if ($source instanceof \Iterator) {
+        $source = function (int $size, callable $pushFn) use ($source) {
+            $feedMore = true;
+            do {
+                if (!$source->valid()) {
+                    $pushFn(null);
+                    return;
+                } else {
+                    $value = $source->current();
+                    $source->next();
+                    if (null !== $value) {
+                        $feedMore = $pushFn($value);
+                    }
+                }
+            } while ($feedMore);
+        };
+    }
 
-    foreach ($source as $item) {
-        $feedMore = $stream->write($item);
-        if (!$feedMore) {
-            break;
+    return new class ($source) implements ReadableObjectStream {
+        use EventEmitterTrait;
+        use ReadableObjectStreamTrait;
+
+        private $readFn;
+
+        public function __construct(callable $readFn)
+        {
+            $this->readFn = $readFn;
+            $this->initReadable();
         }
-    }
 
-    if (!$source->valid()) {
-        $stream->end();
-    }
-
-    return $stream;
+        protected function _read(int $size, callable $pushFn)
+        {
+            call_user_func($this->readFn, $size, $pushFn);
+        }
+    };
 }
 
 function writable(callable $writeFn, array $options = []) : WritableObjectStream
@@ -219,27 +231,33 @@ function transform(callable $transformFn, callable $flushFn = null, array $optio
     };
 }
 
-function through() : DuplexObjectStream
+function through(array $options = []) : DuplexObjectStream
 {
-    return new class implements DuplexObjectStream {
+    return new class ($options['highWaterMark'] ?? 1) implements DuplexObjectStream {
         use EventEmitterTrait;
-        use WritableObjectStreamTrait;
+        use WritableObjectStreamTrait {
+            end as _end;
+        }
         use ReadableObjectStreamTrait;
 
-        public function __construct()
+        public function __construct(int $highWaterMark)
         {
-            $this->initReadable();
+            $this->pendingItemLimit = $highWaterMark;
             $this->initWritable();
+            $this->initReadable();
         }
+
+        /** @see WritableObjectStream */
 
         protected function _write($object, callable $onFlush)
         {
-            try {
-                call_user_func($this->pushFn, $object);
-                $onFlush();
-            } catch (\Throwable $e) {
-                $onFlush($e);
-            }
+            call_user_func($this->pushFn, $object, $onFlush);
+        }
+
+        public function end($object = null, callable $onFinish = null)
+        {
+            $this->_end($object, $onFinish);
+            $this->endRead();
         }
     };
 }
@@ -248,27 +266,31 @@ function iterator(ReadableObjectStream $stream, callable $waitFn) : \Iterator
 {
     $stream->pause();
 
-    $ended = false;
+    $fn = function (ReadableObjectStream $stream, callable $waitFn) {
+        $ended = false;
 
-    $stream->on('end', function () use (&$ended) {
-        $ended = true;
-    });
+        $stream->on('end', function () use (&$ended) {
+            $ended = true;
+        });
 
-    while (!$ended) {
-        $items = $stream->read(1);
+        while (!$ended) {
+            $items = $stream->read(1);
 
-        if (empty($items)) {
-            $promise = __promise($graceful = true);
-            $stream->once('readable', [$promise, 'succeed']);
-            $stream->once('end', [$promise, 'succeed']);
-            $stream->once('error', [$promise, 'fail']);
-            $waitFn($promise);
-        } else {
-            foreach ($items as $item) {
-                yield $item;
+            if (empty($items)) {
+                $promise = __promise($graceful = true);
+                $stream->once('readable', [$promise, 'succeed']);
+                $stream->once('end', [$promise, 'succeed']);
+                $stream->once('error', [$promise, 'fail']);
+                $waitFn($promise);
+            } else {
+                foreach ($items as $item) {
+                    yield $item;
+                }
             }
         }
-    }
+    };
+
+    return $fn($stream, $waitFn);
 }
 
 function __promise(bool $graceful)
