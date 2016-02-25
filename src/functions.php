@@ -209,7 +209,7 @@ function flatten() : DuplexObjectStream
 
 function transform(callable $transformFn, callable $flushFn = null, array $options = []) : DuplexObjectStream
 {
-    return new class ($transformFn, $concurrency['concurrency'] ?? 1) implements DuplexObjectStream {
+    return new class ($transformFn, $options['concurrency'] ?? 1) implements DuplexObjectStream {
         use EventEmitterTrait;
         use WritableObjectStreamTrait {
             end as _end;
