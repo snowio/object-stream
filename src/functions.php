@@ -61,7 +61,7 @@ function writable(callable $writeFn, array $options = []) : WritableObjectStream
 
         public function __construct(callable $writeFn, int $concurrency)
         {
-            $this->pendingItemLimit = $concurrency;
+            $this->pendingItemLimit = max(1, $concurrency);
             $this->writeFn = $writeFn;
             $this->initWritable();
         }
@@ -221,7 +221,7 @@ function transform(callable $transformFn, callable $flushFn = null, array $optio
         public function __construct(callable $transformFn, int $concurrency)
         {
             $this->transformFn = $transformFn;
-            $this->pendingItemLimit = $concurrency;
+            $this->pendingItemLimit = max(1, $concurrency);
             $this->initWritable();
             $this->initReadable();
         }
@@ -250,7 +250,7 @@ function through(array $options = []) : DuplexObjectStream
 
         public function __construct(int $highWaterMark)
         {
-            $this->pendingItemLimit = $highWaterMark;
+            $this->pendingItemLimit = max(1, $highWaterMark);
             $this->initWritable();
             $this->initReadable();
         }
