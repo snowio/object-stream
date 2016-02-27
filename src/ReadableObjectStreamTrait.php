@@ -164,12 +164,16 @@ trait ReadableObjectStreamTrait
                 return false;
             }
 
+            $readBufferEmpty = $this->readBuffer->isEmpty();
+
             if ($this->paused) {
-                $readBufferWasEmpty = $this->readBuffer->isEmpty();
                 $this->readBuffer->enqueue([$object, $onFlush]);
-                if ($readBufferWasEmpty) {
+                if ($readBufferEmpty) {
                     $this->emit('readable');
                 }
+            } elseif (!$readBufferEmpty) {
+                // not paused but buffer has items - must be within resume()
+                $this->readBuffer->enqueue([$object, $onFlush]);
             } else {
                 $this->emitData($object, $onFlush);
             }
@@ -208,15 +212,11 @@ trait ReadableObjectStreamTrait
         }
     }
 
-    private function dequeueFromReadBuffer(int $size = null) : array
+    private function dequeueFromReadBuffer(int $size = null) : \Iterator
     {
-        $tuples = [];
-
         for ($i = 1; $i <= $size ?: PHP_INT_MAX, !$this->readBuffer->isEmpty(); $i++) {
-            $tuples[] = $this->readBuffer->dequeue();
+            yield $this->readBuffer->dequeue();
         }
-
-        return $tuples;
     }
 
     private function endRead()

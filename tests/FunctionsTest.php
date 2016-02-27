@@ -212,7 +212,6 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
 
         $stream->resume();
 
-        sort($collectedData); // todo: get tests to pass without this
         $this->assertSame($expectedOutput, $collectedData);
         $this->assertCount(count($input), $flushResults);
 
