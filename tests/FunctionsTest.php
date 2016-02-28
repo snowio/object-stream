@@ -25,6 +25,30 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
         $this->eventLoop = Factory::create();
     }
 
+    public function testDataObserverErrorBubbles()
+    {
+        $error = new \Exception;
+
+        $buffer = buffer();
+        $buffer->on('data', function () use ($error) {
+            throw $error;
+        });
+
+        $emitted = null;
+
+        $buffer->on('error', function ($e) use (&$emitted) {
+            $emitted = $e;
+        });
+
+        $this->eventLoop->nextTick(function () use ($buffer) {
+            $buffer->write('foo');
+        });
+
+        $this->eventLoop->tick();
+
+        $this->assertSame($error, $emitted);
+    }
+
     public function testReadableEmitsError()
     {
         $error = new \Exception;
