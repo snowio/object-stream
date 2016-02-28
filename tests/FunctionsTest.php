@@ -49,6 +49,12 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
         $map->end();
 
         $this->assertFalse($ended);
+        $this->assertEmpty($items);
+
+        $this->eventLoop->tick();
+
+        $this->assertTrue($ended);
+        $this->assertSame(range(0, 18, 2), $items);
     }
 
     public function testZeroHighWaterMark()
