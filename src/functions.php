@@ -211,15 +211,14 @@ function transform(callable $transformFn, callable $flushFn = null, array $optio
 {
     return new class ($transformFn, $options['concurrency'] ?? 1) implements DuplexObjectStream {
         use EventEmitterTrait;
-        use WritableObjectStreamTrait {
-            end as _end;
-        }
+        use WritableObjectStreamTrait;
         use ReadableObjectStreamTrait;
 
         private $transformFn;
 
         public function __construct(callable $transformFn, int $concurrency)
         {
+            $this->on('finish', [$this, 'ensureEndEmitted']);
             $this->transformFn = $transformFn;
             $this->pendingItemLimit = max(1, $concurrency);
             $this->initWritable();
@@ -230,12 +229,6 @@ function transform(callable $transformFn, callable $flushFn = null, array $optio
         {
             call_user_func($this->transformFn, $object, $this->pushFn, $onFlush, $this->drainEventStream);
         }
-
-        public function end($object = null, callable $onFinish = null)
-        {
-            $this->_end($object, $onFinish);
-            $this->endRead();
-        }
     };
 }
 
@@ -243,13 +236,12 @@ function through(array $options = []) : DuplexObjectStream
 {
     return new class ($options['highWaterMark'] ?? 1) implements DuplexObjectStream {
         use EventEmitterTrait;
-        use WritableObjectStreamTrait {
-            end as _end;
-        }
+        use WritableObjectStreamTrait;
         use ReadableObjectStreamTrait;
 
         public function __construct(int $highWaterMark)
         {
+            $this->on('finish', [$this, 'ensureEndEmitted']);
             $this->pendingItemLimit = max(1, $highWaterMark);
             $this->initWritable();
             $this->initReadable();
@@ -260,12 +252,6 @@ function through(array $options = []) : DuplexObjectStream
         protected function _write($object, callable $onFlush)
         {
             call_user_func($this->pushFn, $object, $onFlush);
-        }
-
-        public function end($object = null, callable $onFinish = null)
-        {
-            $this->_end($object, $onFinish);
-            $this->endRead();
         }
     };
 }

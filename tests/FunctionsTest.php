@@ -9,16 +9,46 @@ use function ObjectStream\through;
 use function ObjectStream\iterator;
 use function ObjectStream\readable;
 use React\EventLoop\Factory;
+use React\EventLoop\LoopInterface;
 use function React\Promise\Timer\timeout;
 use function Clue\React\Block\await;
+use function ObjectStream\map;
 
 class FunctionsTest extends \PHPUnit_Framework_TestCase
 {
+    /** @var LoopInterface */
     private $eventLoop;
 
     public function setUp()
     {
         $this->eventLoop = Factory::create();
+    }
+
+    public function testMapEndWithPendingItems()
+    {
+        $map = map(function ($n, callable $callback) {
+            $this->eventLoop->nextTick(function () use ($callback, $n) {
+                $callback(null, 2 * $n);
+            });
+        }, ['concurrency' => 5]);
+
+        $items = [];
+        $ended = false;
+
+        $map->on('data', function ($n) use (&$items) {
+            $items[] = $n;
+        });
+
+        $map->on('end', function () use (&$ended) {
+            $ended = true;
+        });
+
+        for ($i = 0; $i < 10; $i++) {
+            $map->write($i);
+        }
+        $map->end();
+
+        $this->assertFalse($ended);
     }
 
     public function testZeroHighWaterMark()
