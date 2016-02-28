@@ -25,6 +25,29 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
         $this->eventLoop = Factory::create();
     }
 
+    public function testReadableEmitsError()
+    {
+        $error = new \Exception;
+
+        $readable = readable(function () use ($error) {
+            throw $error;
+        });
+
+        $emitted = null;
+
+        $readable->on('error', function ($e) use (&$emitted) {
+            $emitted = $e;
+        });
+
+        $this->eventLoop->nextTick(function () use ($readable) {
+            $readable->read(0);
+        });
+
+        $this->eventLoop->tick();
+
+        $this->assertSame($error, $emitted);
+    }
+
     public function testWritableEmitsError()
     {
         $error = new \Exception;
