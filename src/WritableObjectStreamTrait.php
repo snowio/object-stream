@@ -91,9 +91,14 @@ trait WritableObjectStreamTrait
                 call_user_func($onFlush, $error);
                 call_user_func($this->flushFn);
             };
-            $this->_write($object, $onFlush);
         } else {
-            $this->_write($object, $this->flushFn);
+            $onFlush = $this->flushFn;
+        }
+
+        try {
+            $this->_write($object, $onFlush);
+        } catch (\Throwable $e) {
+            $onFlush($e);
         }
     }
 

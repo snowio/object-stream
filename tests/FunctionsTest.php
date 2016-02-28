@@ -13,6 +13,7 @@ use React\EventLoop\LoopInterface;
 use function React\Promise\Timer\timeout;
 use function Clue\React\Block\await;
 use function ObjectStream\map;
+use function ObjectStream\writable;
 
 class FunctionsTest extends \PHPUnit_Framework_TestCase
 {
@@ -22,6 +23,29 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
     public function setUp()
     {
         $this->eventLoop = Factory::create();
+    }
+
+    public function testWritableEmitsError()
+    {
+        $error = new \Exception;
+
+        $writable = writable(function () use ($error) {
+            throw $error;
+        });
+
+        $emitted = null;
+
+        $writable->on('error', function ($e) use (&$emitted) {
+            $emitted = $e;
+        });
+
+        $this->eventLoop->nextTick(function () use ($writable) {
+            $writable->write('foo');
+        });
+
+        $this->eventLoop->tick();
+
+        $this->assertSame($error, $emitted);
     }
 
     public function testMapEndWithPendingItems()
