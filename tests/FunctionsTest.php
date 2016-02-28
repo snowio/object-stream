@@ -21,6 +21,36 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
         $this->eventLoop = Factory::create();
     }
 
+    public function testZeroHighWaterMark()
+    {
+        $pipeline = pipeline(
+            buffer(['highWaterMark' => 0]),
+            buffer(['highWaterMark' => 0]),
+            buffer(['highWaterMark' => 0])->pause()
+        );
+
+        $items = [];
+        $ended = false;
+
+        $pipeline->on('data', $onData = function ($item) use (&$items) {
+            $items[] = $item;
+        });
+        $pipeline->on('end', function () use ($pipeline, $onData, &$ended) {
+            $pipeline->removeListener('data', $onData);
+            $ended = true;
+        });
+
+        for ($i = 0; $i < 100; $i++) {
+            $pipeline->write($i);
+        }
+
+        $pipeline->end();
+        $pipeline->resume();
+
+        $this->assertSame(range(0, $i - 1), $items);
+        $this->assertTrue($ended);
+    }
+
     public function testBufferPipeline()
     {
         $pipeline = pipeline(
