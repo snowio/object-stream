@@ -98,20 +98,70 @@ function pipeline(DuplexObjectStream ...$streams) : DuplexObjectStream
 function composite(WritableObjectStream $writable, ReadableObjectStream $readable) : DuplexObjectStream
 {
     return new class ($writable, $readable) implements DuplexObjectStream {
-        use EventEmitterTrait;
         use WritableObjectStreamDecorator;
         use ReadableObjectStreamDecorator;
-        use ReadableObjectStreamTrait {
-            ReadableObjectStreamDecorator::isPaused insteadof ReadableObjectStreamTrait;
-            ReadableObjectStreamDecorator::pause insteadof ReadableObjectStreamTrait;
-            ReadableObjectStreamDecorator::read insteadof ReadableObjectStreamTrait;
-            ReadableObjectStreamDecorator::resume insteadof ReadableObjectStreamTrait;
-        }
 
         public function __construct(WritableObjectStream $writable, ReadableObjectStream $readable)
         {
             $this->setWritable($writable);
             $this->setReadable($readable);
+        }
+
+        public function on($event, callable $listener)
+        {
+            if (in_array($event, ['drain', 'error', 'finish', 'pipe', 'unpipe'])) {
+                $this->writable->on($event, $listener);
+            } else {
+                $this->readable->on($event, $listener);
+            }
+        }
+
+        public function once($event, callable $listener)
+        {
+            if (in_array($event, ['drain', 'error', 'finish', 'pipe', 'unpipe'])) {
+                $this->writable->once($event, $listener);
+            } else {
+                $this->readable->once($event, $listener);
+            }
+        }
+
+        public function removeListener($event, callable $listener)
+        {
+            if (in_array($event, ['drain', 'error', 'finish', 'pipe', 'unpipe'])) {
+                $this->writable->removeListener($event, $listener);
+            } else {
+                $this->readable->removeListener($event, $listener);
+            }
+        }
+
+        public function removeAllListeners($event = null)
+        {
+            if (null === $event) {
+                $this->writable->removeAllListeners();
+                $this->readable->removeAllListeners();
+            } elseif (in_array($event, ['drain', 'error', 'finish', 'pipe', 'unpipe'])) {
+                $this->writable->removeAllListeners($event);
+            } else {
+                $this->readable->removeAllListeners($event);
+            }
+        }
+
+        public function listeners($event)
+        {
+            if (in_array($event, ['drain', 'error', 'finish', 'pipe', 'unpipe'])) {
+                $this->writable->listeners($event);
+            } else {
+                $this->readable->listeners($event);
+            }
+        }
+
+        public function emit($event, array $arguments = [])
+        {
+            if (in_array($event, ['drain', 'error', 'finish', 'pipe', 'unpipe'])) {
+                $this->writable->emit($event, $arguments);
+            } else {
+                $this->readable->emit($event, $arguments);
+            }
         }
     };
 }

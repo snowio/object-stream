@@ -11,12 +11,6 @@ trait WritableObjectStreamDecorator
     private function setWritable(WritableObjectStream $writable)
     {
         $this->writable = $writable;
-
-        foreach (['drain', 'error', 'finish', 'pipe', 'unpipe'] as $eventName) {
-            $writable->on($eventName, function (...$args) use ($eventName) {
-                $this->emit($eventName, $args);
-            });
-        }
     }
 
     /** @see WritableObjectStream */

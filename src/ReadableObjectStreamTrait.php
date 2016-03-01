@@ -43,8 +43,7 @@ trait ReadableObjectStreamTrait
 
         if (!isset($this->pipeDestroyers[$destinationHash])) {
             $writer = function ($data) use ($destination) {
-                $feedMore = $destination->write($data);
-                if (false === $feedMore) {
+                if (!$destination->write($data)) {
                     $this->pause();
                 }
             };
@@ -214,7 +213,7 @@ trait ReadableObjectStreamTrait
 
     private function dequeueFromReadBuffer(int $size = null) : \Iterator
     {
-        for ($i = 1; $i <= $size ?: PHP_INT_MAX, !$this->readBuffer->isEmpty(); $i++) {
+        for ($i = 1; $i <= ($size ?: PHP_INT_MAX) && !$this->readBuffer->isEmpty(); $i++) {
             yield $this->readBuffer->dequeue();
         }
     }

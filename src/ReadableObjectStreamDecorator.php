@@ -9,12 +9,6 @@ trait ReadableObjectStreamDecorator
     private function setReadable(ReadableObjectStream $readable)
     {
         $this->readable = $readable;
-
-        foreach (['data', 'end', 'error', 'readable'] as $eventName) {
-            $readable->on($eventName, function (...$args) use ($eventName) {
-                $this->emit($eventName, $args);
-            });
-        }
     }
 
     public function isPaused(): bool
@@ -28,6 +22,11 @@ trait ReadableObjectStreamDecorator
         return $this;
     }
 
+    public function pipe(WritableObjectStream $destination, array $options = [])
+    {
+        return $this->readable->pipe($destination, $options);
+    }
+
     public function read(int $size = null, bool $allowFewer = true) : array
     {
         return $this->readable->read($size, $allowFewer);
@@ -37,5 +36,10 @@ trait ReadableObjectStreamDecorator
     {
         $this->readable->resume();
         return $this;
+    }
+
+    public function unpipe(WritableObjectStream $destination = null)
+    {
+        $this->readable->unpipe($destination);
     }
 }
