@@ -141,7 +141,7 @@ trait WritableObjectStreamTrait
         if ($this->notifyDrain) {
             $this->notifyDrain = false;
 
-            foreach ($this->listeners('emit') as $listener) {
+            foreach ($this->listeners('drain') as $listener) {
                 if ($this->pendingItemCount >= $this->pendingItemLimit) {
                     $this->notifyDrain = true;
                     break;
