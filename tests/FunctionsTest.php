@@ -10,6 +10,7 @@ use function ObjectStream\iterator;
 use function ObjectStream\readable;
 use React\EventLoop\Factory;
 use React\EventLoop\LoopInterface;
+use React\Promise\Deferred;
 use function React\Promise\Timer\timeout;
 use function Clue\React\Block\await;
 use function ObjectStream\map;
@@ -23,6 +24,44 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
     public function setUp()
     {
         $this->eventLoop = Factory::create();
+    }
+
+    public function testWritableConcurrency()
+    {
+        $concurrency = 0;
+        $peakConcurrency = 0;
+
+        $buffer = buffer();
+
+        $writable = writable(function ($value, callable $callback) use (&$concurrency, &$peakConcurrency) {
+            $concurrency++;
+            $peakConcurrency = max($peakConcurrency, $concurrency);
+            $this->eventLoop->addTimer(0, function () use (&$concurrency, $callback) {
+                $concurrency--;
+                $callback();
+            });
+        }, ['concurrency' => 2]);
+
+        $finished = new Deferred;
+
+        $writable->on('finish', [$finished, 'resolve']);
+        $writable->on('error', [$finished, 'reject']);
+
+        $buffer->pipe($writable);
+
+        for ($i = 0; $i < 100; $i++) {
+            $buffer->write($i);
+        }
+
+        $this->assertEquals(2, $concurrency);
+        $this->assertLessThanOrEqual(2, $peakConcurrency);
+
+        $buffer->end();
+
+        $this->assertEquals(2, $concurrency);
+        $this->assertLessThanOrEqual(2, $peakConcurrency);
+
+        return await(timeout($finished->promise(), 0.1, $this->eventLoop), $this->eventLoop);
     }
 
     public function testPipelineErrorForwarding()
