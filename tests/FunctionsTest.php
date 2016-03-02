@@ -25,6 +25,54 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
         $this->eventLoop = Factory::create();
     }
 
+    public function testPipelineErrorForwarding()
+    {
+        for ($i = 1; $i <= 3; $i++) {
+            $thrown = new \Exception;
+            $emitted = [];
+
+            switch ($i) {
+                case 1:
+                    $pipeline = pipeline(
+                        mapSync(function () use ($thrown) {
+                            throw $thrown;
+                        }),
+                        buffer(),
+                        buffer()
+                    );
+                    break;
+
+                case 2:
+                    $pipeline = pipeline(
+                        buffer(),
+                        mapSync(function () use ($thrown) {
+                            throw $thrown;
+                        }),
+                        buffer()
+                    );
+                    break;
+
+                case 3:
+                    $pipeline = pipeline(
+                        buffer(),
+                        buffer(),
+                        mapSync(function () use ($thrown) {
+                            throw $thrown;
+                        })
+                    );
+                    break;
+            }
+
+            $pipeline->on('error', function ($error) use (&$emitted) {
+                $emitted[] = $error;
+            });
+
+            $pipeline->write('foo');
+
+            $this->assertSame([$thrown], $emitted);
+        }
+    }
+
     public function testDataObserverErrorBubbles()
     {
         $error = new \Exception;

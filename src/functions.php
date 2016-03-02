@@ -85,11 +85,13 @@ function pipeline(DuplexObjectStream ...$streams) : DuplexObjectStream
         $pipeline->emit('error', [$error]);
     };
     $first = $last = $previous = array_shift($streams);
-    $first->on('error', $forwardError);
 
-    foreach ($streams as $stream) {
+    while (null !== $stream = array_shift($streams)) {
         $last = $previous = $previous->pipe($stream);
-        $last->on('error', $forwardError);
+
+        if (0 != count($streams)) {
+            $last->on('error', $forwardError);
+        }
     }
 
     return $pipeline = composite($first, $last);
@@ -100,67 +102,23 @@ function composite(WritableObjectStream $writable, ReadableObjectStream $readabl
     return new class ($writable, $readable) implements DuplexObjectStream {
         use WritableObjectStreamDecorator;
         use ReadableObjectStreamDecorator;
+        use EventEmitterTrait;
 
         public function __construct(WritableObjectStream $writable, ReadableObjectStream $readable)
         {
             $this->setWritable($writable);
             $this->setReadable($readable);
-        }
 
-        public function on($event, callable $listener)
-        {
-            if (in_array($event, ['drain', 'error', 'finish', 'pipe', 'unpipe'])) {
-                $this->writable->on($event, $listener);
-            } else {
-                $this->readable->on($event, $listener);
+            foreach (['drain', 'error', 'finish', 'pipe', 'unpipe'] as $event) {
+                $writable->on($event, function (...$args) use ($event) {
+                    $this->emit($event, $args);
+                });
             }
-        }
 
-        public function once($event, callable $listener)
-        {
-            if (in_array($event, ['drain', 'error', 'finish', 'pipe', 'unpipe'])) {
-                $this->writable->once($event, $listener);
-            } else {
-                $this->readable->once($event, $listener);
-            }
-        }
-
-        public function removeListener($event, callable $listener)
-        {
-            if (in_array($event, ['drain', 'error', 'finish', 'pipe', 'unpipe'])) {
-                $this->writable->removeListener($event, $listener);
-            } else {
-                $this->readable->removeListener($event, $listener);
-            }
-        }
-
-        public function removeAllListeners($event = null)
-        {
-            if (null === $event) {
-                $this->writable->removeAllListeners();
-                $this->readable->removeAllListeners();
-            } elseif (in_array($event, ['drain', 'error', 'finish', 'pipe', 'unpipe'])) {
-                $this->writable->removeAllListeners($event);
-            } else {
-                $this->readable->removeAllListeners($event);
-            }
-        }
-
-        public function listeners($event)
-        {
-            if (in_array($event, ['drain', 'error', 'finish', 'pipe', 'unpipe'])) {
-                $this->writable->listeners($event);
-            } else {
-                $this->readable->listeners($event);
-            }
-        }
-
-        public function emit($event, array $arguments = [])
-        {
-            if (in_array($event, ['drain', 'error', 'finish', 'pipe', 'unpipe'])) {
-                $this->writable->emit($event, $arguments);
-            } else {
-                $this->readable->emit($event, $arguments);
+            foreach (['data', 'end', 'error', 'readable'] as $event) {
+                $readable->on($event, function (...$args) use ($event) {
+                    $this->emit($event, $args);
+                });
             }
         }
     };
