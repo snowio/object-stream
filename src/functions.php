@@ -192,7 +192,7 @@ function concat() : DuplexObjectStream
         }),
         transform(function (ReadableObjectStream $source, callable $pushFn, callable $doneFn, EventStream $drainEventStream) {
             $source->on('data', function ($data) use ($pushFn, $drainEventStream, $source) {
-                if (!$pushFn($data) && false) {
+                if (!$pushFn($data)) {
                     $source->pause();
                     $drainEventStream->once([$source, 'resume']);
                 }
