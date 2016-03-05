@@ -187,7 +187,8 @@ function filterSync(callable $filterFn) : DuplexObjectStream
 function concat() : DuplexObjectStream
 {
     return pipeline(
-        mapSync(function (ReadableObjectStream $source) {
+        mapSync(function ($source) {
+            $source = readable($source);
             return $source->pipe(buffer()->pause());
         }),
         transform(function (ReadableObjectStream $source, callable $pushFn, callable $doneFn, EventStream $drainEventStream) {
@@ -207,18 +208,18 @@ function concat() : DuplexObjectStream
 
 function flatten(array $options = []) : DuplexObjectStream
 {
-    return transform(function ($subject, callable $pushFn, callable $doneFn, EventStream $drainEventStream) {
-        $_stream = readable($subject);
-        $_stream->once('end', $doneFn);
-        $_stream->once('error', $doneFn);
-        $_stream->on('data', function ($data) use ($pushFn, $_stream, $drainEventStream) {
+    return transform(function ($source, callable $pushFn, callable $doneFn, EventStream $drainEventStream) {
+        $source = readable($source);
+        $source->once('end', $doneFn);
+        $source->once('error', $doneFn);
+        $source->on('data', function ($data) use ($pushFn, $source, $drainEventStream) {
             if (!$pushFn($data)) {
-                $_stream->pause();
-                $drainEventStream->once([$_stream, 'resume']);
+                $source->pause();
+                $drainEventStream->once([$source, 'resume']);
             }
         });
-        if (!$_stream->isPaused() && [] === $_stream->read(1)) {
-            $_stream->read(0);
+        if (!$source->isPaused() && [] === $source->read(1)) {
+            $source->read(0);
         }
     }, null, $options);
 }
