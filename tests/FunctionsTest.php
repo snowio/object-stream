@@ -28,11 +28,11 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
 
     public function testFlattenArrays()
     {
-        $streams = array_map(function ($n) {
+        $arrays = array_map(function ($n) {
             return range(10 * $n + 1, 10 * $n + 10);
         }, range(0, 9));
 
-        shuffle($streams);
+        shuffle($arrays);
 
         $flatten = \ObjectStream\flatten();
 
@@ -46,8 +46,8 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
             $ended = true;
         });
 
-        foreach ($streams as $stream) {
-            $flatten->write($stream);
+        foreach ($arrays as $array) {
+            $flatten->write($array);
         }
         $flatten->end();
 
@@ -58,7 +58,7 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
 
     public function testFlattenIterators()
     {
-        $streams = array_map(function ($n) {
+        $iterators = array_map(function ($n) {
             return (function () use ($n) {
                 for ($i = 1; $i <= 10; $i++) {
                     yield $i + $n * 10;
@@ -66,7 +66,7 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
             })();
         }, range(0, 9));
 
-        shuffle($streams);
+        shuffle($iterators);
 
         $flatten = \ObjectStream\flatten();
 
@@ -80,8 +80,8 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
             $ended = true;
         });
 
-        foreach ($streams as $stream) {
-            $flatten->write($stream);
+        foreach ($iterators as $iterator) {
+            $flatten->write($iterator);
         }
         $flatten->end();
 
