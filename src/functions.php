@@ -10,6 +10,10 @@ function buffer(array $options = []) : DuplexObjectStream
 
 function readable($source) : ReadableObjectStream
 {
+    if ($source instanceof ReadableObjectStream) {
+        return $source;
+    }
+
     if (is_array($source)) {
         $source = new \ArrayIterator($source);
     }
@@ -178,6 +182,29 @@ function filterSync(callable $filterFn) : DuplexObjectStream
             $callback($e);
         }
     });
+}
+
+function concat() : DuplexObjectStream
+{
+    return pipeline(
+        mapSync(function (ReadableObjectStream $source) {
+            return $source->pipe(buffer()->pause());
+        }),
+        transform(function (ReadableObjectStream $source, callable $pushFn, callable $doneFn, EventStream $drainEventStream) {
+            $source->on('data', function ($data) use ($pushFn, $drainEventStream, $source) {
+                if (!$pushFn($data) && false) {
+                    $source->pause();
+                    $drainEventStream->once([$source, 'resume']);
+                }
+            });
+            $source->on('end', function () use ($doneFn) {
+                $doneFn();
+            });
+            $source->on('error', $doneFn);
+
+            $source->resume();
+        }, null, ['concurrency' => 1])
+    );
 }
 
 function flatten() : DuplexObjectStream

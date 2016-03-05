@@ -26,6 +26,46 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
         $this->eventLoop = Factory::create();
     }
 
+    public function testConcat()
+    {
+        $streams = array_map(function ($n) {
+            return readable((function () use ($n) {
+                for ($i = 1; $i <= 10; $i++) {
+                    yield $i + $n * 10;
+                }
+            })());
+        }, range(0, 9));
+
+        $concat = \ObjectStream\concat();
+
+        $bucket = [];
+        $ended = false;
+
+        $concat->on('data', function ($item) use (&$bucket) {
+            $bucket[] = $item;
+        });
+        $concat->on('end', function () use (&$ended) {
+            $ended = true;
+        });
+
+        foreach ($streams as $stream) {
+            $concat->write($stream);
+        }
+        $concat->end();
+
+        $this->assertFalse($ended);
+        $this->assertEmpty($bucket);
+
+        shuffle($streams);
+
+        foreach ($streams as $stream) {
+            $stream->resume();
+        }
+
+        //$this->assertTrue($ended);
+        $this->assertSame(range(1, 100), $bucket);
+    }
+
     public function testWritableConcurrency()
     {
         $concurrency = 0;
