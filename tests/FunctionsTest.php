@@ -26,6 +26,70 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
         $this->eventLoop = Factory::create();
     }
 
+    public function testFlattenArrays()
+    {
+        $streams = array_map(function ($n) {
+            return range(10 * $n + 1, 10 * $n + 10);
+        }, range(0, 9));
+
+        shuffle($streams);
+
+        $flatten = \ObjectStream\flatten();
+
+        $bucket = [];
+        $ended = false;
+
+        $flatten->on('data', function ($item) use (&$bucket) {
+            $bucket[] = $item;
+        });
+        $flatten->on('end', function () use (&$ended) {
+            $ended = true;
+        });
+
+        foreach ($streams as $stream) {
+            $flatten->write($stream);
+        }
+        $flatten->end();
+
+        $this->assertTrue($ended);
+        sort($bucket);
+        $this->assertEquals(range(1, 100), $bucket);
+    }
+
+    public function testFlattenIterators()
+    {
+        $streams = array_map(function ($n) {
+            return (function () use ($n) {
+                for ($i = 1; $i <= 10; $i++) {
+                    yield $i + $n * 10;
+                }
+            })();
+        }, range(0, 9));
+
+        shuffle($streams);
+
+        $flatten = \ObjectStream\flatten();
+
+        $bucket = [];
+        $ended = false;
+
+        $flatten->on('data', function ($item) use (&$bucket) {
+            $bucket[] = $item;
+        });
+        $flatten->on('end', function () use (&$ended) {
+            $ended = true;
+        });
+
+        foreach ($streams as $stream) {
+            $flatten->write($stream);
+        }
+        $flatten->end();
+
+        $this->assertTrue($ended);
+        sort($bucket);
+        $this->assertEquals(range(1, 100), $bucket);
+    }
+
     public function testConcat()
     {
         $streams = array_map(function ($n) {
