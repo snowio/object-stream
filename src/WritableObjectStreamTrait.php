@@ -77,9 +77,6 @@ trait WritableObjectStreamTrait
         }
 
         if ($this->pendingItemCount >= $this->pendingItemLimit) {
-            if ($this->pendingItemLimit === 49) {
-                error_log('stream is at concurrency limit',4);
-            }
             $this->notifyDrain = true;
             return false;
         }
