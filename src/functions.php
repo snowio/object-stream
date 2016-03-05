@@ -191,16 +191,14 @@ function concat() : DuplexObjectStream
             return $source->pipe(buffer()->pause());
         }),
         transform(function (ReadableObjectStream $source, callable $pushFn, callable $doneFn, EventStream $drainEventStream) {
+            $source->once('end', $doneFn);
+            $source->once('error', $doneFn);
             $source->on('data', function ($data) use ($pushFn, $drainEventStream, $source) {
                 if (!$pushFn($data)) {
                     $source->pause();
                     $drainEventStream->once([$source, 'resume']);
                 }
             });
-            $source->on('end', function () use ($doneFn) {
-                $doneFn();
-            });
-            $source->on('error', $doneFn);
 
             $source->resume();
         }, null, ['concurrency' => 1])
@@ -211,12 +209,8 @@ function flatten(array $options = []) : DuplexObjectStream
 {
     return transform(function ($subject, callable $pushFn, callable $doneFn, EventStream $drainEventStream) {
         $_stream = readable($subject);
-        $_stream->once('end', function (\Throwable $error = null) use ($doneFn) {
-            $doneFn($error);
-        });
-        $_stream->once('error', function (\Throwable $error) use ($doneFn) {
-            $doneFn($error);
-        });
+        $_stream->once('end', $doneFn);
+        $_stream->once('error', $doneFn);
         $_stream->on('data', function ($data) use ($pushFn, $_stream, $drainEventStream) {
             if (!$pushFn($data)) {
                 $_stream->pause();
