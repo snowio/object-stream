@@ -188,20 +188,20 @@ function concat() : DuplexObjectStream
 {
     $inputMap = mapSync(function ($source) {
         $source = readable($source);
-        return [$source, $source->pipe(buffer()->pause())];
+        $sourceOutputBuffer = $source->pipe(buffer()->pause());
+        if (!$source->isPaused()) {
+            $source->resume();
+        }
+        return $sourceOutputBuffer;
     });
 
     $concatOutputBuffer = buffer();
 
-    $streamHandler = $inputMap->pipe(writable(function (array $streams, callable $doneFn) use ($concatOutputBuffer) {
-        list($source, $sourceOutputBuffer) = $streams;
-        $sourceOutputBuffer->once('end', $doneFn);
-        $sourceOutputBuffer->once('error', $doneFn);
-        $sourceOutputBuffer->pipe($concatOutputBuffer, ['end' => false]);
-        $sourceOutputBuffer->resume();
-        if (!$source->isPaused()) {
-            $source->resume();
-        }
+    $streamHandler = $inputMap->pipe(writable(function (ReadableObjectStream $source, callable $doneFn) use ($concatOutputBuffer) {
+        $source->once('end', $doneFn);
+        $source->once('error', $doneFn);
+        $source->pipe($concatOutputBuffer, ['end' => false]);
+        $source->resume();
     }, ['concurrency' => 1]));
 
     $streamHandler->once('finish', [$concatOutputBuffer, 'end']);
@@ -221,8 +221,8 @@ function flatten(array $options = []) : DuplexObjectStream
                 $drainEventStream->once([$source, 'resume']);
             }
         });
-        if (!$source->isPaused() && [] === $source->read(1)) {
-            $source->read(0);
+        if (!$source->isPaused()) {
+            $source->resume();
         }
     }, null, $options);
 }
