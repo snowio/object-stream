@@ -207,39 +207,26 @@ function concat() : DuplexObjectStream
     );
 }
 
-function flatten() : DuplexObjectStream
+function flatten(array $options = []) : DuplexObjectStream
 {
-    $stream = null;
-
-    $transformFn = function ($object, callable $pushFn, callable $doneFn, EventStream $drainEventStream) use (&$stream) {
-        if (is_array($object)) {
-            $object = new \ArrayIterator($object);
+    return transform(function ($subject, callable $pushFn, callable $doneFn, EventStream $drainEventStream) {
+        $_stream = readable($subject);
+        $_stream->on('data', function ($data) use ($pushFn, $_stream, $drainEventStream) {
+            if (!$pushFn($data)) {
+                $_stream->pause();
+                $drainEventStream->once([$_stream, 'resume']);
+            }
+        });
+        $_stream->once('end', function (\Throwable $error = null) use ($doneFn) {
+            $doneFn($error);
+        });
+        $_stream->once('error', function (\Throwable $error) use ($doneFn) {
+            $doneFn($error);
+        });
+        if (!$_stream->isPaused() && [] === $_stream->read(1)) {
+            $_stream->read(0);
         }
-
-        if ($object instanceof \Iterator) {
-            $flow = function () use ($object, $pushFn, $doneFn, $drainEventStream, &$flow) {
-                while ($object->valid()) {
-                    $item = $object->current();
-                    $feedMore = $pushFn($item);
-                    $object->next();
-
-                    if (!$feedMore) {
-                        $drainEventStream->once($flow);
-                        return;
-                    }
-                }
-
-                $doneFn();
-            };
-
-            $flow();
-        } else {
-            $pushFn($object);
-            $doneFn();
-        }
-    };
-
-    return transform($transformFn);
+    }, null, $options);
 }
 
 function transform(callable $transformFn, callable $flushFn = null, array $options = []) : DuplexObjectStream
