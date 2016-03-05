@@ -186,24 +186,27 @@ function filterSync(callable $filterFn) : DuplexObjectStream
 
 function concat() : DuplexObjectStream
 {
-    return pipeline(
-        mapSync(function ($source) {
-            $source = readable($source);
-            return $source->pipe(buffer()->pause());
-        }),
-        transform(function (ReadableObjectStream $source, callable $pushFn, callable $doneFn, EventStream $drainEventStream) {
-            $source->once('end', $doneFn);
-            $source->once('error', $doneFn);
-            $source->on('data', function ($data) use ($pushFn, $drainEventStream, $source) {
-                if (!$pushFn($data)) {
-                    $source->pause();
-                    $drainEventStream->once([$source, 'resume']);
-                }
-            });
+    $inputMap = mapSync(function ($source) {
+        $source = readable($source);
+        return [$source, $source->pipe(buffer()->pause())];
+    });
 
+    $concatOutputBuffer = buffer();
+
+    $streamHandler = $inputMap->pipe(writable(function (array $streams, callable $doneFn) use ($concatOutputBuffer) {
+        list($source, $sourceOutputBuffer) = $streams;
+        $sourceOutputBuffer->once('end', $doneFn);
+        $sourceOutputBuffer->once('error', $doneFn);
+        $sourceOutputBuffer->pipe($concatOutputBuffer, ['end' => false]);
+        $sourceOutputBuffer->resume();
+        if (!$source->isPaused()) {
             $source->resume();
-        }, null, ['concurrency' => 1])
-    );
+        }
+    }, ['concurrency' => 1]));
+
+    $streamHandler->once('finish', [$concatOutputBuffer, 'end']);
+
+    return composite($inputMap, $concatOutputBuffer);
 }
 
 function flatten(array $options = []) : DuplexObjectStream

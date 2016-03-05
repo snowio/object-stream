@@ -124,14 +124,86 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
         $this->assertEquals(range(1, 100), $bucket);
     }
 
-    public function testConcat()
+    public function testConcatArrays()
+    {
+        $arrays = array_map(function ($n) {
+            return range(10 * $n + 1, 10 * $n + 10);
+        }, range(0, 9));
+
+        $concat = \ObjectStream\concat()->pause();
+
+        $bucket = [];
+        $ended = false;
+
+        $concat->on('data', function ($item) use (&$bucket) {
+            $bucket[] = $item;
+        });
+        $concat->on('end', function () use (&$ended) {
+            $ended = true;
+        });
+
+        foreach ($arrays as $array) {
+            $concat->write($array);
+        }
+        $concat->end();
+
+        $this->assertFalse($ended);
+        $this->assertEmpty($bucket);
+
+        shuffle($arrays);
+
+        $concat->resume();
+
+        $this->assertTrue($ended);
+        $this->assertSame(range(1, 100), $bucket);
+    }
+
+    public function testConcatIterators()
+    {
+        $iterators = array_map(function ($n) {
+            return (function () use ($n) {
+                for ($i = 1; $i <= 10; $i++) {
+                    yield $i + $n * 10;
+                }
+            })();
+        }, range(0, 9));
+
+        $concat = \ObjectStream\concat()->pause();
+
+        $bucket = [];
+        $ended = false;
+
+        $concat->on('data', function ($item) use (&$bucket) {
+            $bucket[] = $item;
+        });
+        $concat->on('end', function () use (&$ended) {
+            $ended = true;
+        });
+
+        foreach ($iterators as $stream) {
+            $concat->write($stream);
+        }
+        $concat->end();
+
+        $this->assertFalse($ended);
+        $this->assertEmpty($bucket);
+
+        shuffle($iterators);
+
+        $concat->resume();
+
+        $this->assertTrue($ended);
+        $this->assertSame(range(1, 100), $bucket);
+    }
+
+    public function testConcatStreams()
     {
         $streams = array_map(function ($n) {
             return readable((function () use ($n) {
                 for ($i = 1; $i <= 10; $i++) {
                     yield $i + $n * 10;
                 }
-            })());
+            })())->pause();
         }, range(0, 9));
 
         $concat = \ObjectStream\concat();
