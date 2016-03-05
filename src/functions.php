@@ -211,17 +211,17 @@ function flatten(array $options = []) : DuplexObjectStream
 {
     return transform(function ($subject, callable $pushFn, callable $doneFn, EventStream $drainEventStream) {
         $_stream = readable($subject);
-        $_stream->on('data', function ($data) use ($pushFn, $_stream, $drainEventStream) {
-            if (!$pushFn($data)) {
-                $_stream->pause();
-                $drainEventStream->once([$_stream, 'resume']);
-            }
-        });
         $_stream->once('end', function (\Throwable $error = null) use ($doneFn) {
             $doneFn($error);
         });
         $_stream->once('error', function (\Throwable $error) use ($doneFn) {
             $doneFn($error);
+        });
+        $_stream->on('data', function ($data) use ($pushFn, $_stream, $drainEventStream) {
+            if (!$pushFn($data)) {
+                $_stream->pause();
+                $drainEventStream->once([$_stream, 'resume']);
+            }
         });
         if (!$_stream->isPaused() && [] === $_stream->read(1)) {
             $_stream->read(0);
