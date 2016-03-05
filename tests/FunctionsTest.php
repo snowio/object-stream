@@ -62,7 +62,7 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
             $stream->resume();
         }
 
-        //$this->assertTrue($ended);
+        $this->assertTrue($ended);
         $this->assertSame(range(1, 100), $bucket);
     }
 
