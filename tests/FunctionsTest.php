@@ -26,6 +26,30 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
         $this->eventLoop = Factory::create();
     }
 
+    public function testConcatErrorForwarding()
+    {
+        $thrown = new \Exception;
+
+        $concat = \ObjectStream\concat();
+
+        $source = readable((function () use ($thrown) {
+            if (false) {
+                yield 'foo';
+            }
+            throw $thrown;
+        })());
+
+        $concat->write($source);
+
+        $emitted = false;
+
+        $concat->on('error', function ($error) use (&$emitted) {
+            $emitted = $error;
+        });
+
+        $this->assertEquals($thrown, $emitted);
+    }
+
     public function testEarlyEndBuffer()
     {
         $ended = false;

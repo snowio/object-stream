@@ -188,6 +188,9 @@ function concat() : DuplexObjectStream
     $inputMap = mapSync(function ($source) {
         $source = readable($source);
         $sourceOutputBuffer = $source->pipe(buffer()->pause());
+        $source->once('error', function ($error) use ($sourceOutputBuffer) {
+            $sourceOutputBuffer->emit('error', [$error]);
+        });
         if (!$source->isPaused()) {
             $source->resume();
         }
@@ -196,7 +199,7 @@ function concat() : DuplexObjectStream
 
     $concatOutputBuffer = buffer();
 
-    $streamHandler = $inputMap->pipe(writable(function (ReadableObjectStream $source, callable $doneFn) use ($concatOutputBuffer) {
+    $streamHandler = $inputMap->pipe($w = writable(function (ReadableObjectStream $source, callable $doneFn) use ($concatOutputBuffer) {
         $source->once('end', $doneFn);
         $source->once('error', $doneFn);
         $source->pipe($concatOutputBuffer, ['end' => false]);
@@ -205,7 +208,12 @@ function concat() : DuplexObjectStream
 
     $streamHandler->once('finish', [$concatOutputBuffer, 'end']);
 
-    return composite($inputMap, $concatOutputBuffer);
+    $composite = composite($inputMap, $concatOutputBuffer);
+    $w->once('error', function ($error) use ($composite) {
+        $composite->emit('error', [$error]);
+    });
+
+    return $composite;
 }
 
 function flatten(array $options = []) : DuplexObjectStream
