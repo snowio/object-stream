@@ -1,15 +1,19 @@
 <?php
 namespace ObjectStream;
 
-use Evenement\EventEmitterInterface;
-
 /**
  * @event data
  * @event end
  * @event error
  * @event readable
+ *
+ * @method ReadableObjectStream emit(string $event, array $args = [])
+ * @method ReadableObjectStream on(string $event, callable $listener)
+ * @method ReadableObjectStream once(string $event, callable $listener)
+ * @method ReadableObjectStream removeListener(string $event, callable $listener)
+ * @method ReadableObjectStream removeAllListeners(string $event = null)
  */
-interface ReadableObjectStream extends EventEmitterInterface
+interface ReadableObjectStream extends EventEmitter
 {
     public function isPaused() : bool;
 

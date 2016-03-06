@@ -157,6 +157,8 @@ trait ReadableObjectStreamTrait
     {
         $this->readBuffer = new \SplQueue();
 
+        $this->registerPersistentEvents('end', 'error');
+
         $this->pushFn = function ($object, callable $onFlush = null) : bool {
             if (null === $object) {
                 $this->endRead();

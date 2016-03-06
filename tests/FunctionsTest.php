@@ -26,6 +26,42 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
         $this->eventLoop = Factory::create();
     }
 
+    public function testEarlyEndBuffer()
+    {
+        $ended = false;
+        $buffer = buffer();
+
+        $buffer->end();
+
+        $buffer->on('end', function () use (&$ended) {
+            $ended = true;
+        });
+
+        $this->assertTrue($ended);
+    }
+
+    public function testEmptyConcatSource()
+    {
+        $concat = \ObjectStream\concat();
+
+        $source = readable((function () {
+            if (false) {
+                yield 'foo';
+            }
+        })());
+
+        $concat->write($source);
+        $concat->end();
+
+        $ended = false;
+
+        $concat->on('end', function () use (&$ended) {
+            $ended = true;
+        });
+
+        $this->assertTrue($ended);
+    }
+
     public function testFlattenArrays()
     {
         $arrays = array_map(function ($n) {

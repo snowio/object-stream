@@ -1,7 +1,6 @@
 <?php
 namespace ObjectStream;
 
-use Evenement\EventEmitterInterface;
 use ObjectStream\Exception\StreamEndedException;
 
 /**
@@ -10,8 +9,14 @@ use ObjectStream\Exception\StreamEndedException;
  * @event finish
  * @event pipe
  * @event unpipe
+ *
+ * @method WritableObjectStream emit(string $event, array $args = [])
+ * @method WritableObjectStream on(string $event, callable $listener)
+ * @method WritableObjectStream once(string $event, callable $listener)
+ * @method WritableObjectStream removeListener(string $event, callable $listener)
+ * @method WritableObjectStream removeAllListeners(string $event = null)
  */
-interface WritableObjectStream extends EventEmitterInterface
+interface WritableObjectStream extends EventEmitter
 {
     public function cork();
 

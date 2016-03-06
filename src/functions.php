@@ -1,8 +1,6 @@
 <?php
 namespace ObjectStream;
 
-use Evenement\EventEmitterTrait;
-
 function buffer(array $options = []) : DuplexObjectStream
 {
     return through($options);
@@ -112,6 +110,7 @@ function composite(WritableObjectStream $writable, ReadableObjectStream $readabl
         {
             $this->setWritable($writable);
             $this->setReadable($readable);
+            $this->registerPersistentEvents('end', 'error', 'finish');
 
             foreach (['drain', 'error', 'finish', 'pipe', 'unpipe'] as $event) {
                 $writable->on($event, function (...$args) use ($event) {

@@ -106,6 +106,8 @@ trait WritableObjectStreamTrait
     {
         $this->writeBuffer = new \SplQueue();
 
+        $this->registerPersistentEvents('error', 'finish');
+
         $this->flushFn = function ($error = null) {
             $this->pendingItemCount--;
 
