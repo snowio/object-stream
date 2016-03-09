@@ -26,6 +26,24 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
         $this->eventLoop = Factory::create();
     }
 
+    public function testToArray()
+    {
+        $buffer = buffer();
+
+        $array = null;
+        \ObjectStream\toArray($buffer, function ($error, $_array) use (&$array) {
+            $array = $_array;
+        });
+
+        for ($i = 1; $i <= 100; $i++) {
+            $buffer->write($i);
+        }
+
+        $buffer->end();
+
+        $this->assertSame(range(1, 100), $array);
+    }
+
     public function testConcatErrorForwarding()
     {
         $thrown = new \Exception;
