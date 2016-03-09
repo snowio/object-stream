@@ -6,6 +6,18 @@ function buffer(array $options = []) : DuplexObjectStream
     return through($options);
 }
 
+function toArray(ReadableObjectStream $stream, callable $callback)
+{
+    $array = [];
+    $stream->on('data', function ($item) use (&$array) {
+        $array[] = $item;
+    });
+    $stream->once('error', $callback);
+    $stream->once('end', function () use ($callback, &$array) {
+        $callback(null, $array);
+    });
+}
+
 function readable($source) : ReadableObjectStream
 {
     if ($source instanceof ReadableObjectStream) {
