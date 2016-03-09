@@ -82,7 +82,7 @@ function writable(callable $writeFn, array $options = []) : WritableObjectStream
 
         protected function _write($object, callable $onFlush)
         {
-            call_user_func($this->writeFn, $object, $onFlush, $this->drainEventStream);
+            __callMaybeSync($this->writeFn, [$object, $onFlush, $this->drainEventStream], $onFlush);
         }
     };
 }
