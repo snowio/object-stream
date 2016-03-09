@@ -142,33 +142,32 @@ function composite(WritableObjectStream $writable, ReadableObjectStream $readabl
 function map(callable $mapFn, array $options = []) : DuplexObjectStream
 {
     $transformFn = function ($object, callable $pushFn, callable $doneFn) use ($mapFn) {
-        $mapFn($object, function ($error = null, $result = null) use ($pushFn, $doneFn) {
+        $callback = function ($error = null, $result = null) use ($pushFn, $doneFn) {
             if (null !== $error) {
                 $doneFn($error);
             } else {
                 $pushFn($result, $doneFn);
             }
-        });
+        };
+
+        __callMaybeSync($mapFn, [$object, $callback], $callback);
     };
 
     return transform($transformFn, null, $options);
 }
 
+/**
+ * @deprecated Use map() directly
+ */
 function mapSync(callable $mapFn) : DuplexObjectStream
 {
-    return map(function ($object, callable $callback) use ($mapFn) {
-        try {
-            $callback(null, $mapFn($object));
-        } catch (\Throwable $e) {
-            $callback($e);
-        }
-    });
+    return map($mapFn);
 }
 
-function filter(callable $filterFn, array $options = []) : DuplexObjectStream
+function filter(callable $predicate, array $options = []) : DuplexObjectStream
 {
-    $transformFn = function ($object, callable $pushFn, callable $doneFn) use ($filterFn) {
-        $filterFn($object, function ($error = null, $keep = null) use ($object, $pushFn, $doneFn) {
+    $transformFn = function ($object, callable $pushFn, callable $doneFn) use ($predicate) {
+        $callback = function ($error = null, $keep = null) use ($object, $pushFn, $doneFn) {
             if (null !== $error) {
                 $doneFn($error);
             } else {
@@ -178,21 +177,20 @@ function filter(callable $filterFn, array $options = []) : DuplexObjectStream
                     $doneFn();
                 }
             }
-        });
+        };
+
+        __callMaybeSync($predicate, [$object, $callback], $callback);
     };
 
     return transform($transformFn, null, $options);
 }
 
-function filterSync(callable $filterFn) : DuplexObjectStream
+/**
+ * @deprecated Use filter() directly
+ */
+function filterSync(callable $predicate) : DuplexObjectStream
 {
-    return filter(function ($object, callable $callback) use ($filterFn) {
-        try {
-            $callback(null, $filterFn($object));
-        } catch (\Throwable $e) {
-            $callback($e);
-        }
-    });
+    return filter($predicate);
 }
 
 function concat() : DuplexObjectStream
@@ -244,6 +242,63 @@ function flatten(array $options = []) : DuplexObjectStream
             $source->resume();
         }
     }, null, $options);
+}
+
+function chunk($predicateOrSize) : DuplexObjectStream
+{
+    if (is_int($predicateOrSize)) {
+        if ($predicateOrSize < 1) {
+            throw new \InvalidArgumentException('Chunk size must be at least 1.');
+        }
+
+        $desiredChunkSize = $predicateOrSize;
+        $currentChunkSize = 0;
+        $predicate = function () use ($desiredChunkSize, &$currentChunkSize) {
+            if (!$continueChunk = ++$currentChunkSize <= $desiredChunkSize) {
+                $currentChunkSize = 1;
+            }
+            return $continueChunk;
+        };
+    } elseif (!is_callable($predicateOrSize)) {
+        throw new \InvalidArgumentException('Callable or positive int expected.');
+    } else {
+        $predicate = $predicateOrSize;
+    }
+
+    $currentChunk = null;
+    $chunker = transform(function ($item, callable $pushFn, callable $doneFn) use ($predicate, &$currentChunk) {
+        $callback = function ($error, $continueChunk = null) use ($item, $pushFn, $doneFn, &$currentChunk) {
+            if (null !== $error) {
+                $doneFn($error);
+            } else {
+                if (!$continueChunk) { // terminate this chunk
+                    if ($currentChunk) {
+                        $currentChunk->end();
+                    }
+                    $currentChunk = buffer();
+                    $pushFn($currentChunk);
+                } elseif (!$currentChunk) {
+                    $currentChunk = buffer();
+                    $pushFn($currentChunk);
+                }
+                $currentChunk->write($item);
+                $doneFn();
+            }
+        };
+
+        __callMaybeSync($predicate, [$item, $callback], $callback);
+    }, null, ['concurrency' => 1]);
+
+    $chunker->once('end', function () use (&$currentChunk) {
+        if ($currentChunk) {
+            $currentChunk->end();
+        }
+    });
+
+    $inputBuffer = buffer();
+    $inputBuffer->pipe($chunker);
+
+    return composite($inputBuffer, $chunker);
 }
 
 function transform(callable $transformFn, callable $flushFn = null, array $options = []) : DuplexObjectStream
@@ -324,6 +379,32 @@ function iterator(ReadableObjectStream $stream, callable $waitFn) : \Iterator
     };
 
     return $fn($stream, $waitFn);
+}
+
+/**
+ * @todo Add coroutine support?
+ */
+function __callMaybeSync(callable $function, array $args, callable $callback)
+{
+    try {
+        $result = call_user_func_array($function, $args);
+        if (null === $result) {
+            return;
+        } elseif (method_exists($result, 'then')) {
+            $result->then(
+                function ($result = null) use ($callback) {
+                    $callback(null, $result);
+                },
+                $callback
+            );
+        } elseif (method_exists($result, 'when')) {
+            $result->when($callback);
+        } else {
+            $callback(null, $result);
+        }
+    } catch (\Throwable $e) {
+        $callback($e);
+    }
 }
 
 function __promise(bool $graceful)

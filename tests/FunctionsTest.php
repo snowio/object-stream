@@ -26,6 +26,27 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
         $this->eventLoop = Factory::create();
     }
 
+    public function testChunkInt()
+    {
+        $chunker = \ObjectStream\chunk($chunkSize = 10);
+
+        $arrayStream = $chunker->pipe(map('\ObjectStream\toArray'));
+
+        \ObjectStream\toArray($arrayStream, function ($error = null, $_arrays) use (&$arrays) {
+            $arrays = $_arrays;
+        });
+
+        $expectedArrays = [];
+
+        for ($i = 1; $i <= 100; $i++) {
+            $expectedArrays[floor(($i - 1) / $chunkSize)][] = $i;
+            $chunker->write($i);
+        }
+        $chunker->end();
+
+        $this->assertSame($expectedArrays, $arrays);
+    }
+
     public function testToArray()
     {
         $buffer = buffer();
