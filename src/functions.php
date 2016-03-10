@@ -197,7 +197,7 @@ function concat() : DuplexObjectStream
 {
     $inputMap = mapSync(function ($source) {
         $source = readable($source);
-        $sourceOutputBuffer = $source->pipe(buffer()->pause());
+        $sourceOutputBuffer = $source->pipe(buffer());
         $source->once('error', function ($error) use ($sourceOutputBuffer) {
             $sourceOutputBuffer->emit('error', [$error]);
         });
@@ -213,7 +213,6 @@ function concat() : DuplexObjectStream
         $source->once('end', $doneFn);
         $source->once('error', $doneFn);
         $source->pipe($concatOutputBuffer, ['end' => false]);
-        $source->resume();
     }, ['concurrency' => 1]));
 
     $streamHandler->once('finish', [$concatOutputBuffer, 'end']);
@@ -352,8 +351,6 @@ function through(array $options = []) : DuplexObjectStream
 
 function iterator(ReadableObjectStream $stream, callable $waitFn) : \Iterator
 {
-    $stream->pause();
-
     $fn = function (ReadableObjectStream $stream, callable $waitFn) {
         $ended = false;
 
