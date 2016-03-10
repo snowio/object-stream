@@ -26,6 +26,37 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
         $this->eventLoop = Factory::create();
     }
 
+    public function testImplicitPause()
+    {
+        $buffer = buffer();
+
+        $buffer->end(1);
+        $buffer->on('end', function () use (&$ended) { $ended = true; });
+
+        $this->assertNull($ended);
+
+        $buffer->on('data', function ($_data) use (&$data) { $data = $_data; });
+
+        $this->assertTrue($ended);
+        $this->assertSame(1, $data);
+    }
+
+    public function testExplicitPause()
+    {
+        $buffer = buffer()->pause();
+
+        $buffer->end(1);
+        $buffer->on('end', function () use (&$ended) { $ended = true; });
+        $buffer->on('data', function ($_data) use (&$data) { $data = $_data; });
+
+        $this->assertNull($ended);
+
+        $buffer->resume();
+
+        $this->assertTrue($ended);
+        $this->assertSame(1, $data);
+    }
+
     public function testChunkerPauseResume()
     {
         $pipeline = pipeline(
