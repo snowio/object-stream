@@ -289,7 +289,7 @@ function chunk($predicateOrSize) : DuplexObjectStream
         __callMaybeSync($predicate, [$item, $callback], $callback);
     }, null, ['concurrency' => 1]);
 
-    $chunker->once('end', function () use (&$currentChunk) {
+    $chunker->once('end', function () use (&$currentChunk, $chunker) {
         if ($currentChunk) {
             $currentChunk->end();
         }
@@ -312,7 +312,7 @@ function transform(callable $transformFn, callable $flushFn = null, array $optio
 
         public function __construct(callable $transformFn, int $concurrency)
         {
-            $this->on('finish', [$this, 'ensureEndEmitted']);
+            $this->on('finish', [$this, 'endRead']);
             $this->transformFn = $transformFn;
             $this->pendingItemLimit = max(1, $concurrency);
             $this->initWritable();

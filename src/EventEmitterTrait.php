@@ -52,6 +52,7 @@ trait EventEmitterTrait
         }
 
         $this->_on($event, $listener);
+        $this->emit('__listenersChanged');
 
         return $this;
     }
@@ -62,6 +63,7 @@ trait EventEmitterTrait
             call_user_func_array($listener, $this->persistentEvents[$event]);
         } else {
             $this->_once($event, $listener);
+            $this->emit('__listenersChanged');
         }
 
         return $this;
@@ -70,6 +72,7 @@ trait EventEmitterTrait
     public function removeListener(string $event, callable $listener) : EventEmitter
     {
         $this->_removeListener($event, $listener);
+        $this->emit('__listenersChanged');
 
         return $this;
     }
@@ -77,6 +80,7 @@ trait EventEmitterTrait
     public function removeAllListeners(string $event = null) : EventEmitter
     {
         $this->_removeAllListeners($event);
+        $this->emit('__listenersChanged');
 
         return $this;
     }

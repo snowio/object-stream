@@ -12,6 +12,8 @@ trait ReadableObjectStreamTrait
     private $pendingItemLimit = 1;
     private $readEnded = false;
     private $readEndEmitted = false;
+    private $hasDataListeners = false;
+    private $isFlowing = false;
 
     protected function _read(int $size, callable $pushFn)
     {
@@ -123,13 +125,22 @@ trait ReadableObjectStreamTrait
     {
         $this->paused = false;
 
-        while (!$this->paused) {
-            if ([] === $this->read(1)) {
-                $this->read(0);
+        if ($this->isFlowing) {
+            return $this;
+        }
+
+        $this->isFlowing = true;
+        try {
+            while (!$this->paused && $this->hasDataListeners) {
                 if ([] === $this->read(1)) {
-                    break;
+                    $this->read(0);
+                    if ([] === $this->read(1)) {
+                        break;
+                    }
                 }
             }
+        } finally {
+            $this->isFlowing = false;
         }
 
         return $this;
@@ -157,6 +168,13 @@ trait ReadableObjectStreamTrait
     {
         $this->readBuffer = new \SplQueue();
 
+        $this->on('__listenersChanged', function () {
+            $this->hasDataListeners = (0 != count($this->listeners('data')));
+            if (!$this->paused) {
+                $this->resume();
+            }
+        });
+
         $this->registerPersistentEvents('end', 'error');
 
         $this->pushFn = function ($object, callable $onFlush = null) : bool {
@@ -167,7 +185,7 @@ trait ReadableObjectStreamTrait
 
             $readBufferEmpty = $this->readBuffer->isEmpty();
 
-            if ($this->paused) {
+            if ($this->paused || !$this->hasDataListeners) {
                 $this->readBuffer->enqueue([$object, $onFlush]);
                 if ($readBufferEmpty) {
                     $this->emit('readable');

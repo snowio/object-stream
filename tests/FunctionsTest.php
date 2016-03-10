@@ -26,6 +26,43 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
         $this->eventLoop = Factory::create();
     }
 
+    public function testChunkerPauseResume()
+    {
+        $pipeline = pipeline(
+            \ObjectStream\chunk($chunkSize = 1),
+            \ObjectStream\concat()
+        )->pause();
+
+        for ($i = 1; $i <= 100; $i++) {
+            $pipeline->write($i);
+        }
+        $pipeline->end();
+
+        \ObjectStream\toArray($pipeline, function ($_error = null, $_output = null) use (&$error, &$output) {
+            $error = $_error;
+            $output = $_output;
+        });
+
+        $pipeline->pipe($destination = writable(function ($item, callable $callback) {
+            $this->eventLoop->addTimer(0, function () use ($callback) {$callback();});
+        }), ['concurrency' => 10]);
+
+        if ($error) {
+            throw $error;
+        }
+
+        $pipeline->resume();
+
+        $finished = new Deferred;
+
+        $destination->on('finish', [$finished, 'resolve']);
+        $destination->on('error', [$finished, 'reject']);
+
+        await(timeout($finished->promise(), 0.1, $this->eventLoop), $this->eventLoop);
+
+        $this->assertSame(range(1, 100), $output);
+    }
+
     public function testChunkInt()
     {
         $chunker = \ObjectStream\chunk($chunkSize = 10);
@@ -658,6 +695,8 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
         $r->on('error', function ($error) use (&$caught) {
             $caught = $error;
         });
+
+        $r->on('data', function () {});
 
         $r->resume();
 
