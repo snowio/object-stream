@@ -31,6 +31,7 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
         $buffer = buffer();
 
         $buffer->end(1);
+        $buffer->resume();
         $buffer->on('end', function () use (&$ended) { $ended = true; });
 
         $this->assertNull($ended);
