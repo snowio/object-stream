@@ -22,7 +22,7 @@
         "psr-4": {
             "ObjectStream\\": "src"
         },
-        "files": [ "src/functions.php" ]
+        "files": [ "src/functions.php", "src/promise_functions.php" ]
     },
     "autoload-dev": {
         "psr-4": {
