@@ -434,16 +434,12 @@ function __promise(bool $graceful)
             });
         }
 
-        public function when(callable $callback, $cbData = null) : self
+        public function when(callable $callback, ...$args) : self
         {
             if ($this->isResolved) {
-                if ($cbData === null) {
-                    $callback($this->error, $this->result);
-                } else {
-                    $callback($this->error, $this->result, $cbData);
-                }
+                call_user_func($callback, $this->error, $this->result, ...$args);
             } else {
-                $this->observers[] = [$callback, $cbData];
+                $this->observers[] = [$callback, $args];
             }
 
             return $this;
@@ -473,7 +469,7 @@ function __promise(bool $graceful)
             $this->result = $result;
 
             while (null !== $observer = array_shift($this->observers)) {
-                $this->when($observer[0], $observer[1]);
+                $this->when($observer[0], ...$observer[1]);
             }
 
             return $this;
