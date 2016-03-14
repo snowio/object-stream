@@ -404,9 +404,14 @@ function __callMaybeSync(callable $function, array $args, callable $callback)
     }
 }
 
-function __promise(bool $graceful)
+function __fulfilledPromise($result) : Promise
 {
-    return new class ($graceful) {
+    return __promise($graceful = false)->succeed($result);
+}
+
+function __promise(bool $graceful) : Promise
+{
+    return new class ($graceful) implements Promise {
         private $graceful;
         private $isResolved = false;
         private $error;
@@ -434,7 +439,7 @@ function __promise(bool $graceful)
             });
         }
 
-        public function when(callable $callback, ...$args) : self
+        public function when(callable $callback, ...$args) : Promise
         {
             if ($this->isResolved) {
                 call_user_func($callback, $this->error, $this->result, ...$args);
@@ -445,17 +450,17 @@ function __promise(bool $graceful)
             return $this;
         }
 
-        public function succeed($result = null) : self
+        public function succeed($result = null) : Promise
         {
             return $this->resolve(null, $result);
         }
 
-        public function fail(\Throwable $error) : self
+        public function fail(\Throwable $error) : Promise
         {
             return $this->resolve($error);
         }
 
-        public function resolve(\Throwable $error = null, $result = null) : self
+        public function resolve(\Throwable $error = null, $result = null) : Promise
         {
             if ($this->isResolved) {
                 if ($this->graceful) {
