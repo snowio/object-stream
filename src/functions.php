@@ -141,6 +141,7 @@ function composite(WritableObjectStream $writable, ReadableObjectStream $readabl
                 if ($dataListener) {
                     if (0 == count($this->listeners('data'))) {
                         $readable->removeListener('data', $dataListener);
+                        $dataListener = null;
                     }
                 } elseif (0 != count($this->listeners('data'))) {
                     $readable->on('data', $dataListener = function ($data) {

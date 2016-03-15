@@ -35,16 +35,25 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
         });
 
         $stream->write('foo');
+        $stream->write('bar');
         $stream->end();
 
+        $this->assertNull($ended);
+
+        $stream->on('data', $l = function ($_data) use (&$data, &$l, $stream) {
+            $data = $_data;
+            $stream->removeListener('data', $l);
+        });
+
+        $this->assertSame('foo', $data);
         $this->assertNull($ended);
 
         $stream->on('data', function ($_data) use (&$data) {
             $data = $_data;
         });
 
+        $this->assertSame('bar', $data);
         $this->assertTrue($ended);
-        $this->assertSame('foo', $data);
     }
 
     public function testImplicitPause()
