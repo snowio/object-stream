@@ -130,11 +130,24 @@ function composite(WritableObjectStream $writable, ReadableObjectStream $readabl
                 });
             }
 
-            foreach (['data', 'end', 'error', 'readable'] as $event) {
+            foreach (['end', 'error', 'readable'] as $event) {
                 $readable->on($event, function (...$args) use ($event) {
                     $this->emit($event, $args);
                 });
             }
+
+            // the data listener causes the stream to start flowing so only listen when there is a real listener
+            $this->on('__listenersChanged', function () use ($readable, &$dataListener) {
+                if ($dataListener) {
+                    if (0 == count($this->listeners('data'))) {
+                        $readable->removeListener('data', $dataListener);
+                    }
+                } elseif (0 != count($this->listeners('data'))) {
+                    $readable->on('data', $dataListener = function ($data) {
+                        $this->emit('data', [$data]);
+                    });
+                }
+            });
         }
     };
 }

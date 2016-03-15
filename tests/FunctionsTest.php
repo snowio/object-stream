@@ -26,6 +26,27 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
         $this->eventLoop = Factory::create();
     }
 
+    public function testCompositeAwaitsDataListener()
+    {
+        $stream = \ObjectStream\composite($input = buffer(), $input->pipe(buffer()));
+
+        $stream->on('end', function () use (&$ended) {
+            $ended = true;
+        });
+
+        $stream->write('foo');
+        $stream->end();
+
+        $this->assertNull($ended);
+
+        $stream->on('data', function ($_data) use (&$data) {
+            $data = $_data;
+        });
+
+        $this->assertTrue($ended);
+        $this->assertSame('foo', $data);
+    }
+
     public function testImplicitPause()
     {
         $buffer = buffer();
