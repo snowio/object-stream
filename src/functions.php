@@ -223,7 +223,7 @@ function concat() : DuplexObjectStream
 
     $concatOutputBuffer = buffer();
 
-    $streamHandler = $inputMap->pipe($w = writable(function (ReadableObjectStream $source, callable $doneFn) use ($concatOutputBuffer) {
+    $streamHandler = $inputMap->pipe(writable(function (ReadableObjectStream $source, callable $doneFn) use ($concatOutputBuffer) {
         $source->once('end', $doneFn);
         $source->once('error', $doneFn);
         $source->pipe($concatOutputBuffer, ['end' => false]);
@@ -232,7 +232,7 @@ function concat() : DuplexObjectStream
     $streamHandler->once('finish', [$concatOutputBuffer, 'end']);
 
     $composite = composite($inputMap, $concatOutputBuffer);
-    $w->once('error', function ($error) use ($composite) {
+    $streamHandler->once('error', function ($error) use ($composite) {
         $composite->emit('error', [$error]);
     });
 
