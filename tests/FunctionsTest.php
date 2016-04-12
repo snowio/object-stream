@@ -11,6 +11,7 @@ use function ObjectStream\readable;
 use React\EventLoop\Factory;
 use React\EventLoop\LoopInterface;
 use React\Promise\Deferred;
+use React\Promise\PromiseInterface;
 use function React\Promise\Timer\timeout;
 use function Clue\React\Block\await;
 use function ObjectStream\map;
@@ -120,7 +121,7 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
         $destination->on('finish', [$finished, 'resolve']);
         $destination->on('error', [$finished, 'reject']);
 
-        await(timeout($finished->promise(), 0.1, $this->eventLoop), $this->eventLoop);
+        $this->await($finished->promise(), 0.1);
 
         $this->assertSame(range(1, 100), $output);
     }
@@ -469,7 +470,7 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
         $this->assertEquals(2, $concurrency);
         $this->assertLessThanOrEqual(2, $peakConcurrency);
 
-        return await(timeout($finished->promise(), 0.1, $this->eventLoop), $this->eventLoop);
+        $this->await($finished->promise(), 0.1);
     }
 
     public function testPipelineErrorForwarding()
@@ -831,9 +832,9 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
         $collectedData = [];
 
         foreach ($input as $i => $item) {
-            $feedMore = $stream->write($item, Promise::resolver(function ($error = null, $result = null) use (&$flushResults) {
+            $stream->write($item, function ($error = null, $result = null) use (&$flushResults) {
                 $flushResults[] = [$error, $result];
-            }));
+            });
 //            $this->assertSame($i < $highWaterMark - 1, $feedMore);
         }
 
@@ -850,9 +851,9 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
         $this->assertCount(count($input), $flushResults);
 
         foreach ($input as $item) {
-            $feedMore = $stream->write($item, Promise::resolver(function ($error = null, $result = null) use (&$flushResults) {
+            $feedMore = $stream->write($item, function ($error = null, $result = null) use (&$flushResults) {
                 $flushResults[] = [$error, $result];
-            }));
+            });
             $this->assertTrue($feedMore);
         }
 
@@ -872,7 +873,18 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
                 }
             }
 
-            return await(timeout($promise, $timeout, $this->eventLoop), $this->eventLoop);
+            return $this->await($promise, $timeout);
         };
+    }
+
+    private function await($thenable, float $timeout = 0.1)
+    {
+        if (!$thenable instanceof PromiseInterface) {
+            $deferred = new Deferred;
+            $thenable->then([$deferred, 'resolve'], [$deferred, 'reject']);
+            $thenable = $deferred->promise();
+        }
+
+        return await(timeout($thenable, $timeout, $this->eventLoop), $this->eventLoop);
     }
 }
