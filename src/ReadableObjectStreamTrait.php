@@ -9,7 +9,7 @@ trait ReadableObjectStreamTrait
     private $pushFn;
     /** @var \SplQueue */
     private $readBuffer;
-    private $pendingItemLimit = 1;
+    private $highWaterMark = 1;
     private $readEnded = false;
     private $readEndEmitted = false;
     private $hasDataListeners = false;
@@ -197,7 +197,7 @@ trait ReadableObjectStreamTrait
                 $this->emitData($object, $onFlush);
             }
 
-            return $this->readBuffer->count() < $this->pendingItemLimit;
+            return $this->readBuffer->count() < $this->highWaterMark;
         };
     }
 

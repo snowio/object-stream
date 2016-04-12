@@ -9,8 +9,8 @@ trait WritableObjectStreamTrait
     private $writeEnded = false;
     private $finished = false;
     private $notifyDrain = false;
-    private $pendingItemCount = 0;
-    private $pendingItemLimit = 1;
+    private $writeConcurrency = 0;
+    private $writeConcurrencyLimit = 1;
     private $flushFn;
     private $drainEventStream;
     /** @var \SplQueue */
@@ -45,7 +45,7 @@ trait WritableObjectStreamTrait
             $this->uncork();
             $this->writeEnded = true;
 
-            if (0 >= $this->pendingItemCount) {
+            if (0 >= $this->writeConcurrency) {
                 $this->ensureFinished();
             }
         }
@@ -68,7 +68,7 @@ trait WritableObjectStreamTrait
             throw new StreamEndedException;
         }
 
-        $this->pendingItemCount++;
+        $this->writeConcurrency++;
 
         if ($this->corked) {
             $this->writeBuffer->enqueue([$object, $onFlush]);
@@ -76,7 +76,7 @@ trait WritableObjectStreamTrait
             $this->doWrite($object, $onFlush);
         }
 
-        if ($this->pendingItemCount >= $this->pendingItemLimit) {
+        if ($this->writeConcurrency >= $this->writeConcurrencyLimit) {
             $this->notifyDrain = true;
             return false;
         }
@@ -109,18 +109,18 @@ trait WritableObjectStreamTrait
         $this->registerPersistentEvents('error', 'finish');
 
         $this->flushFn = function ($error = null) {
-            $this->pendingItemCount--;
+            $this->writeConcurrency--;
 
             if ($error) {
                 $this->emit('error', [$error]);
             }
 
-            if ($this->pendingItemCount < $this->pendingItemLimit) {
+            if ($this->writeConcurrency < $this->writeConcurrencyLimit) {
                 $this->writable();
             }
 
-            if ($this->pendingItemCount <= 0 && $this->writeEnded) {
-                // invoking writable() can cause $this->pendingItemCount to change!!
+            if ($this->writeConcurrency <= 0 && $this->writeEnded) {
+                // invoking writable() can cause $this->writeConcurrency to change!!
                 $this->ensureFinished();
             }
         };
@@ -144,7 +144,7 @@ trait WritableObjectStreamTrait
             $this->notifyDrain = false;
 
             foreach ($this->listeners('drain') as $listener) {
-                if ($this->pendingItemCount >= $this->pendingItemLimit) {
+                if ($this->writeConcurrency >= $this->writeConcurrencyLimit) {
                     $this->notifyDrain = true;
                     break;
                 }

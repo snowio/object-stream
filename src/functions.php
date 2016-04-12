@@ -75,7 +75,7 @@ function writable(callable $writeFn, array $options = []) : WritableObjectStream
 
         public function __construct(callable $writeFn, int $concurrency)
         {
-            $this->pendingItemLimit = max(1, $concurrency);
+            $this->writeConcurrencyLimit = max(1, $concurrency);
             $this->writeFn = $writeFn;
             $this->initWritable();
         }
@@ -316,18 +316,19 @@ function chunk($predicateOrSize) : DuplexObjectStream
 
 function transform(callable $transformFn, callable $flushFn = null, array $options = []) : DuplexObjectStream
 {
-    return new class ($transformFn, $options['concurrency'] ?? 1) implements DuplexObjectStream {
+    return new class ($transformFn, $options['concurrency'] ?? 1, $options['highWaterMark'] ?? 1) implements DuplexObjectStream {
         use EventEmitterTrait;
         use WritableObjectStreamTrait;
         use ReadableObjectStreamTrait;
 
         private $transformFn;
 
-        public function __construct(callable $transformFn, int $concurrency)
+        public function __construct(callable $transformFn, int $concurrency, int $highWaterMark)
         {
             $this->on('finish', [$this, 'endRead']);
             $this->transformFn = $transformFn;
-            $this->pendingItemLimit = max(1, $concurrency);
+            $this->writeConcurrencyLimit = max(1, $concurrency);
+            $this->highWaterMark = max(1, $highWaterMark);
             $this->initWritable();
             $this->initReadable();
         }
@@ -349,7 +350,7 @@ function through(array $options = []) : DuplexObjectStream
         public function __construct(int $highWaterMark)
         {
             $this->on('finish', [$this, 'ensureEndEmitted']);
-            $this->pendingItemLimit = max(1, $highWaterMark);
+            $this->highWaterMark = max(1, $highWaterMark);
             $this->initWritable();
             $this->initReadable();
         }
