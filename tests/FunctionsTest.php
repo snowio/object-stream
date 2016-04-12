@@ -16,6 +16,7 @@ use function React\Promise\Timer\timeout;
 use function Clue\React\Block\await;
 use function ObjectStream\map;
 use function ObjectStream\writable;
+use function ObjectStream\transform;
 
 class FunctionsTest extends \PHPUnit_Framework_TestCase
 {
@@ -25,6 +26,26 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
     public function setUp()
     {
         $this->eventLoop = Factory::create();
+    }
+
+    public function testTransformerPause()
+    {
+        $pipeline = pipeline(
+            buffer(['highWaterMark' => 5]),
+            transform(function ($item, callable $pushFn, callable $flushFn) {
+                $pushFn($item);
+                $flushFn();
+            }),
+            buffer(['highWaterMark' => 5])
+        );
+
+        for ($i = 0; $i < 10; $i++) {
+            $this->assertTrue($pipeline->write('foo'));
+        }
+
+        for ($i = 0; $i < 10; $i++) {
+            $this->assertFalse($pipeline->write('foo'));
+        }
     }
 
     public function testCompositeAwaitsDataListener()

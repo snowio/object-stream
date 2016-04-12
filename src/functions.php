@@ -318,7 +318,7 @@ function transform(callable $transformFn, callable $flushFn = null, array $optio
 {
     return new class ($transformFn, $options['concurrency'] ?? 1, $options['highWaterMark'] ?? 1) implements DuplexObjectStream {
         use EventEmitterTrait;
-        use WritableObjectStreamTrait;
+        use WritableObjectStreamTrait { isWritable as _isWritable; }
         use ReadableObjectStreamTrait;
 
         private $transformFn;
@@ -331,11 +331,31 @@ function transform(callable $transformFn, callable $flushFn = null, array $optio
             $this->highWaterMark = max(1, $highWaterMark);
             $this->initWritable();
             $this->initReadable();
+
+            $origPushFn = $this->pushFn;
+            $this->pushFn = function ($object, callable $onFlush = null) use ($origPushFn) {
+                return $origPushFn($object, function ($error = null) use ($onFlush) {
+                    try {
+                        if ($onFlush) {
+                            $onFlush($error);
+                        }
+                    } finally {
+                        if ($this->isWritable()) {
+                            $this->writable();
+                        }
+                    }
+                });
+            };
         }
 
         protected function _write($object, callable $onFlush)
         {
             call_user_func($this->transformFn, $object, $this->pushFn, $onFlush, $this->drainEventStream);
+        }
+
+        private function isWritable()
+        {
+            return $this->_isWritable() && $this->readBuffer->count() < $this->highWaterMark;
         }
     };
 }
@@ -350,6 +370,7 @@ function through(array $options = []) : DuplexObjectStream
         public function __construct(int $highWaterMark)
         {
             $this->on('finish', [$this, 'ensureEndEmitted']);
+            $this->writeConcurrencyLimit = max(1, $highWaterMark);
             $this->highWaterMark = max(1, $highWaterMark);
             $this->initWritable();
             $this->initReadable();

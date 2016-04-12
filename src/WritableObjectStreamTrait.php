@@ -76,12 +76,13 @@ trait WritableObjectStreamTrait
             $this->doWrite($object, $onFlush);
         }
 
-        if ($this->writeConcurrency >= $this->writeConcurrencyLimit) {
-            $this->notifyDrain = true;
-            return false;
+        if ($this->isWritable()) {
+            return true;
         }
 
-        return true;
+        $this->notifyDrain = true;
+
+        return false;
     }
 
     private function doWrite($object, callable $onFlush = null)
@@ -115,7 +116,7 @@ trait WritableObjectStreamTrait
                 $this->emit('error', [$error]);
             }
 
-            if ($this->writeConcurrency < $this->writeConcurrencyLimit) {
+            if ($this->isWritable()) {
                 $this->writable();
             }
 
@@ -126,6 +127,11 @@ trait WritableObjectStreamTrait
         };
 
         $this->drainEventStream = new EventStream($this, 'drain');
+    }
+
+    private function isWritable()
+    {
+        return $this->writeConcurrency < $this->writeConcurrencyLimit;
     }
 
     private function ensureFinished()
