@@ -19,6 +19,11 @@ function read(ReadableObjectStream $stream) : Promise
 {
     if ([] !== $items = $stream->read(1)) {
         return __fulfilledPromise($items[0]);
+    } else {
+        $stream->read(0);
+        if ([] !== $items = $stream->read(1)) {
+            return __fulfilledPromise($items[0]);
+        }
     }
 
     $dataPromise = __promise($graceful = true);
