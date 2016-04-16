@@ -60,7 +60,15 @@ function readable($source) : ReadableObjectStream
 
         protected function _read(int $size, callable $pushFn)
         {
-            call_user_func($this->readFn, $size, $pushFn);
+            $pushFn = function ($error = null, $item = null) use ($pushFn) {
+                if (!$error) {
+                    $pushFn($item);
+                } else {
+                    $pushFn(null);
+                }
+            };
+
+            __callMaybeSync($this->readFn, [$size, $pushFn], $pushFn);
         }
     };
 }
