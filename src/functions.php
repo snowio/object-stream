@@ -412,6 +412,11 @@ function iterator(ReadableObjectStream $stream, callable $waitFn) : \Iterator
             $items = $stream->read(1);
 
             if (empty($items)) {
+                $stream->read(0);
+                $items = $stream->read(1);
+            }
+
+            if (empty($items)) {
                 $promise = __promise($graceful = true);
                 $stream->once('readable', [$promise, 'succeed']);
                 $stream->once('end', [$promise, 'succeed']);

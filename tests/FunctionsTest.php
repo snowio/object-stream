@@ -825,6 +825,11 @@ class FunctionsTest extends \PHPUnit_Framework_TestCase
         $this->assertSame(range(0, 9), iterator_to_array(iterator($stream, $waitFn)));
     }
 
+    public function testStreamToIteratorAutoFlows()
+    {
+        $this->assertSame(range(0, 9), iterator_to_array(iterator(readable(range(0, 9)), function () {})));
+    }
+
     public function testStreamToIteratorError()
     {
         $stream = buffer();
