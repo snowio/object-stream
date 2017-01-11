@@ -487,8 +487,10 @@ function __promise(bool $graceful) : Promise
         {
             $this->when(function (\Throwable $error = null, $result = null) use ($onSuccess, $onFailure) {
                 if (null === $error) {
-                    call_user_func($onSuccess, $result);
-                } else {
+                    if (null !== $onSuccess) {
+                        call_user_func($onSuccess, $result);
+                    }
+                } elseif (null !== $onFailure) {
                     call_user_func($onFailure, $error);
                 }
             });
